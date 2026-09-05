@@ -147,6 +147,66 @@ of an MIT project under stricter terms also reads as ungenerous.
 
 ---
 
+## Display — five conflicts between the current screen and the evidence
+
+Research is in `docs/research-limit-behaviour.md`. Five things the phase 1 screen
+does that the evidence argues against. **None resolved yet** — recorded so the
+redesign starts from a list rather than a vibe.
+
+**1. The bar fills.** `drawUsageBlock()` draws a bar that grows with utilization.
+A bar filling toward "complete" invents a completion goal, and goal gradient then
+predicts acceleration toward it — the end-of-window burn we most want to avoid. A
+bar that *empties* invents nothing. Cheapest fix on the list, and the one with
+the clearest theory behind it.
+
+**2. Two level-based thresholds.** Amber at 60%, red at 85%. The alarm literature
+says people probability-match their response rate to an alert's hit rate, so a
+60% threshold firing on most working days goes invisible in a week and discredits
+the 85% behind it. The evidence wants **one** state change, tied to a projection
+crossing a line, not a level.
+
+**3. Precision runs the wrong way at the top.** Currently one decimal below 10%
+and whole percent above. Directionally right at the low end, but it never gets
+coarser as the window closes — which is where precision provably causes
+overspending. Wants a band near exhaustion, not a number.
+
+**4. The countdown is the smallest thing on screen.** Percentage at 24pt bold,
+"resets in 2h 14m" at 16px dim. The evidence says time-to-reset is the single
+most effective defence against hoarding, because it converts "I am running out"
+into "I get more at 3:40". The weighting is backwards.
+
+**5. It shows used, not remaining.** Utilization is what the API reports, so this
+was inherited rather than chosen. "38% left" matches the question the user is
+actually asking. Not clear-cut — the small-area effect means a lone shrinking
+number grabs attention hardest late — which is another argument for pairing it
+with the countdown rather than showing it alone.
+
+### And one strategy-level tension
+
+The evidence for *ambience* is weaker than the evidence against it. Making
+scarcity salient is contested and largely failed a 20-study replication audit;
+the taxi meter effect — watching a meter reduces the pleasure of the metered
+activity — is better evidenced. Realistic behaviour change from passive
+consumption feedback is 1–3%.
+
+The strategy already says "ambient indicator **that can be looked at directly**,
+meant to help decide how to continue working." The evidence supports the second
+half more strongly than the first. That is a reason to make the resting state
+carry roughly one bit — fine, or not fine — rather than a reason to change the
+strategy.
+
+Also worth holding onto: **being ignored is not the failure mode.** Being
+unplugged is. The two causes named are a display that changes when nothing
+meaningful happened, and one that is unpleasant to have in your eye line.
+
+### How not to evaluate this
+
+METR's 2025 trial found experienced developers were ~19% slower with AI tools
+while believing themselves faster. Introspection about AI-assisted work is
+unreliable, so "does it feel helpful?" is not a usable test. Every display choice
+here is a hypothesis; the only real evidence would be logging what actually
+happened.
+
 ## Open questions
 
 - **Does a `claude setup-token` token carry the `user:profile` scope** that
@@ -157,5 +217,13 @@ of an MIT project under stricter terms also reads as ungenerous.
 - **Terms of service.** Consumer terms prohibit automated access except via an
   API key; `claude setup-token` is Anthropic's own automation command. See
   `data-inventory.md`. An account-owner call.
-- **Rationing or use-it-or-lose-it?** A depleting meter can cause either. Which
-  one this design should guard against is not yet decided. Research pending.
+- **Which of the five display conflicts to act on, and in what order.** The
+  emptying bar is cheapest and best-supported. The projection-based single
+  threshold is the largest change and needs a burn-rate estimate that does not
+  yet exist.
+- **Rationing or use-it-or-lose-it?** Answered, mostly: under-use dominates
+  nearly every metered domain studied, so hoarding is the failure to design
+  against — *except* in the 5-hour window, whose near, certain, non-rolling
+  endpoint is exactly the condition that flips behaviour toward end-of-window
+  burn. The two windows want opposite treatments, which the current screen does
+  not give them.
