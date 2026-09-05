@@ -40,6 +40,11 @@ overwrites. Short version:
 ~/.local/bin/pio run -t upload
 ```
 
+**There is no over-the-air update.** Every firmware change means a USB-C cable.
+Settings survive a reflash — NVS sits between the written regions and is not
+touched — so updating an already-configured device does not mean setting it up
+again.
+
 ## 2. Join the device's network
 
 On first boot the device has no configuration, so it creates its own WiFi

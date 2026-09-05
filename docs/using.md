@@ -77,8 +77,12 @@ device is part of the measurement, which is a reason to sample politely.
 
 Earlier firmware shipped a 60-second default by accident: `config.h` said 120
 but the setup portal had 60 pre-selected, and the portal won. Devices set up
-before this was fixed made 1,440 calls a day. Updating repairs them
-automatically — a stored value below the floor is clamped up on the next boot.
+before the fix made 1,440 calls a day.
+
+**Flashing the new firmware repairs them**, and your token, PIN and WiFi survive
+it — a stored interval below the floor is clamped up on the first boot after the
+update. There is no over-the-air update, so this means a USB-C cable. Getting
+all the way to 300s needs a re-provision, which today means a factory reset.
 
 ## When something is wrong
 

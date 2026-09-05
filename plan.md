@@ -213,6 +213,25 @@ sitting in front of is silly. A button-opened menu covering brightness, refresh
 interval, and a manual refresh would cover the common tweaks locally. Reads as
 complementary to the panel, not competing with it.
 
+### Over-the-air updates
+The partition table already carries everything needed — `otadata` plus two 6.5 MB
+app slots, of which the 1.19 MB firmware uses 18% of one. Nothing uses them.
+
+This matters more than it looks for a desk object. Every change today means
+unplugging the device, finding a USB-C cable, and carrying it to a computer,
+which is enough friction to stop small improvements from being worth making.
+It also means the fleet is exactly one device, forever, because nobody else will
+do that either.
+
+Pairs naturally with the LAN panel: an authenticated upload endpoint there, or
+plain ArduinoOTA on the same network. The PIN already exists as a credential.
+
+Caution worth stating up front: a bad OTA image on a device with no physical
+buttons and a screen that may not come up is the one way to make this thing
+genuinely hard to recover. The dual-slot layout is what protects against that,
+so any implementation must roll back on a failed boot rather than overwrite in
+place.
+
 ### The rest
 
 - **Ease the token handoff.** Joining the setup AP drops your phone or laptop off the internet, so the token has to be already copied before you switch networks. A QR code on the device pointing at `http://192.168.4.1`, and a note on the setup page telling you to copy the token first, would cover most of the pain
