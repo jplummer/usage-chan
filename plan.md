@@ -13,6 +13,9 @@ windows, with no host computer and no org-level API key.
 - **StackChan-BSP** (github.com/m5stack/StackChan-BSP) – M5Stack's official Arduino board support package. Not a firmware: a driver library for the servo bus, the 12 RGB LEDs, the capacitive touch pads, the INA226 current sensor and NFC. MIT. Relevant from phase two on; see the decision log.
 
 ## How the data works
+
+*Superseded in part — see `docs/data-inventory.md` for the full surface,
+including a second endpoint that costs no inference.*
 One minimal request to api.anthropic.com/v1/messages, max_tokens set to one, authenticated with a Claude Code OAuth token from `claude setup-token`. The response headers carry the live numbers: anthropic-ratelimit-unified-5h-utilization, -7d-utilization, and their matching -reset fields. This is undocumented behavior, not a published contract, but it's consistent across half a dozen independent projects. Build in a visible failure state for the day a response comes back without them.
 
 ---
@@ -219,5 +222,22 @@ complementary to the panel, not competing with it.
 - **Sleep or dim on a schedule.** A lit 320x240 panel on a nightstand at 2am is a lot
 - **Poll less when idle.** Utilization that hasn't moved in an hour doesn't need a 2-minute poll, and every poll spends the budget it reports on
 
+### 2026-09-05 — Data surface inventoried
+`docs/data-inventory.md`. The finding that matters: `GET /api/oauth/usage`
+returns the same windows plus Opus and Sonnet weeklies, **at no inference
+cost**, where the current `/v1/messages` probe spends a sliver of the budget it
+reports on. Endpoint existence confirmed here (429 unauthenticated, vs 404 for
+a fabricated path).
+
+Not switching yet. Two things to settle first: the utilization scale differs
+(0–100 there, 0–1 in the headers) and would silently produce 100x-wrong gauges
+if the parser moved unchanged, and the JSON schema is actively moving in a way
+the header set is not.
+
 ## Open questions
-- Nothing blocking. Next real work is phase 2, or the parked ideas above
+- **Switch to `/api/oauth/usage`, or read both?** Reading both gives Opus and
+  Sonnet breakdown *and* `representative-claim`. Costs one extra request
+- **Terms of service.** Consumer terms prohibit automated access except via an
+  API key; `claude setup-token` is Anthropic's own command for automation. See
+  `docs/data-inventory.md`. Unresolved, and an account-owner call
+- Next build work: phase 1.5, starting with the two cheap setup fixes
