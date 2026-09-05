@@ -23,8 +23,7 @@ second surface that is cheaper and much richer.
 |---|---|---|
 | Cost | A real inference call. **Spends the budget it reports on** | None. No tokens consumed |
 | 5h / 7d utilization | Yes | Yes |
-| Opus weekly | **No** | Yes |
-| Sonnet weekly | **No** | Yes |
+| Opus / Sonnet weekly | **No** | Yes, but see below |
 | Which window is binding | Yes, via `representative-claim` | Yes, via `limits[].is_active` |
 | Extra-usage credits and spend | Partial | Full, with dollar amounts |
 | Utilization scale | **0–1 fraction** | **0–100 percent** |
@@ -38,7 +37,28 @@ countdown as "due". Any switch has to change the parser, not just the URL.
 
 Endpoint existence checked directly from this machine, unauthenticated:
 `GET /api/oauth/usage` returns **429** (rate-limited) where a fabricated path
-under the same prefix returns **404**. The path is real.
+under the same prefix returns **404**. The path is real — and that 429 is a
+preview of its temperament.
+
+**It rate-limits aggressively.** robinebers/openusage, the most-used client,
+says so in a code comment and implements a hard 5-minute lockout after a 429,
+during which it makes no call at all and serves the last good values with a
+staleness note. Its own user-facing copy reads: *"Updates blocked by Anthropic.
+Be patient — manual refreshes will make it worse."* Its refresh cadence is a
+fixed 5 minutes with no setting to change it.
+
+**Open risk — token scope.** That client states an inference-only token from
+`claude setup-token` authenticates but cannot read usage; it wants
+`user:profile`. Other research puts `user:profile` in the setup-token scope
+list. Unresolved and account-specific. Test before building on it:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://api.anthropic.com/api/oauth/usage \
+  -H "Authorization: Bearer $YOUR_OAT_TOKEN" -H "anthropic-beta: oauth-2025-04-20"
+```
+
+200 means the endpoint is available to this project. 401 or 403 means phase 1's
+header probe stays the only route.
 
 ---
 
@@ -110,8 +130,18 @@ A captured response, March 2026:
 records that typing `utilization` as non-nullable turned a single null into a
 whole-response parse failure. Any parser here must tolerate both.
 
-A newer `limits[]` array was captured in July 2026 and supersedes the flat
-per-model keys, which were null on both probed accounts. Each entry carries
+**The flat per-model keys are dead.** `seven_day_opus` and `seven_day_sonnet`
+now return `null`; Anthropic moved per-model weekly windows into a `limits[]`
+array as `weekly_scoped` rows keyed by `scope.model.display_name`. This is
+confirmed by robinebers/openusage, whose Fable meter reads exactly that path
+and whose commit message documents the migration.
+
+**Do not hard-code model names.** Iterate `limits[]`, take every entry with
+`kind == "weekly_scoped"`, and read `scope.model.display_name` and `percent`.
+That is forward-compatible with Opus, Sonnet, Haiku, Fable, Cowork, or whatever
+ships next. A client that hard-codes `seven_day_opus` renders nothing today.
+
+The `limits[]` array was captured in July 2026. Each entry carries
 `kind` (`session` | `weekly_all` | `weekly_scoped`), `scope.model.display_name`,
 `percent`, `severity`, `resets_at`, and `is_active` — the last marking the
 binding limit. Only one of the six projects reads it; the rest still read the
@@ -168,6 +198,26 @@ The 200-without-headers case is the one most likely to be misread as a bug.
 Phase 1 already reports it as `no_usage_h_200`, which is correct but cryptic.
 
 ---
+
+## The local-files boundary
+
+A standalone device can never show these, because no server has them. They are
+computed by walking `~/.claude/projects/**/*.jsonl` (plus pi and Cowork session
+directories) and multiplying token counts by a pricing table downloaded
+hourly from GitHub Pages, LiteLLM and models.dev:
+
+- Tokens used today, yesterday, last 30 days
+- Dollars for the same periods — **estimated, not measured.** Token counts are
+  real; the money is arithmetic
+- The usage trend graph (31 daily bars of tokens/day)
+- Per-model spend breakdown
+
+There is no Anthropic endpoint behind any of it. This is a hard boundary on
+what usage-chan can ever be, and it is worth knowing before designing toward a
+number that cannot arrive.
+
+Also local, perhaps surprisingly: the **plan name** ("Max 20x") comes from the
+credential blob, not the API.
 
 ## What is NOT available
 
