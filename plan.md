@@ -234,6 +234,29 @@ Not switching yet. Two things to settle first: the utilization scale differs
 if the parser moved unchanged, and the JSON schema is actively moving in a way
 the header set is not.
 
+### 2026-09-05 — Strategy settled, and two living docs started
+**An ambient indicator that can be looked at directly for more detail, meant to
+help decide how to continue working.** Chan-ness is icing. Dollar and token
+totals are out — they answer a different question, and half of them are
+unreachable anyway. Captured in `docs/design-decisions.md`.
+
+`docs/setup.md` and `docs/using.md` are **living documents**, updated with every
+change that touches setup or day-to-day use. They exist to be inspected for
+process intelligibility, not just to inform — if a step reads badly there, that
+is a finding.
+
+### 2026-09-05 — Poll rate cut to 5 minutes
+Was effectively 60s: `config.h` said 120 but the portal shipped 60 pre-selected
+and the portal won, so provisioned devices made 1,440 calls a day. Now 300s
+default, 120s floor, 900s ceiling. The floor repairs existing devices on next
+boot via the clamp in `settingsLoad()`.
+
+### 2026-09-05 — `/api/oauth/usage` throttles before it authenticates
+An unauthenticated request returns **429** with `retry-after: 784`, where
+`/v1/messages` returns 401 for the same. Pre-auth throttling behind Cloudflare
+suggests an IP-keyed limiter — inferred, not proven — which would mean a desktop
+monitor and this device share one bucket. Staying on the header probe for now.
+
 ## Open questions
 - **Switch to `/api/oauth/usage`, or read both?** Reading both gives Opus and
   Sonnet breakdown *and* `representative-claim`. Costs one extra request

@@ -10,11 +10,28 @@
 #define FW_VERSION              "0.1.0"
 
 // ── Polling ──────────────────────────────────────────────
-// Every poll is a real (if tiny) API call, so it counts against the very
-// budget being displayed. 120s is the upstream default and stays here.
-#define DEFAULT_POLL_SEC        120
-#define MIN_POLL_SEC            30
-#define MAX_POLL_SEC            300
+// Every poll is a real (if tiny) API call, so it counts against the very budget
+// being displayed. Two independent reasons the floor is where it is:
+//
+//   Over-sampling. The 5-hour window is 300 minutes, so even at a burn rate
+//   that would exhaust it, whole-percent utilization moves once every three
+//   minutes. Polling faster cannot show anything the last poll didn't. The
+//   7-day window moves 1% per 100 minutes. Countdowns need no polling at all —
+//   they are computed locally from the stored reset epoch, which is why the
+//   screen can redraw every second between fetches.
+//
+//   The server's temper. Anthropic's usage surfaces rate-limit hard; the
+//   most-used desktop client polls on a fixed 5-minute cadence with no setting
+//   to change it, and locks itself out for 5 minutes after a 429. Its own copy
+//   warns that manual refreshes make things worse.
+//
+// 300s default. The old 120 was contradicted by the setup portal, which shipped
+// 60s selected — so provisioned devices ran at 1,440 calls a day. Raising the
+// floor to 120 also repairs those devices on next boot, since settingsLoad()
+// clamps whatever is already in NVS.
+#define DEFAULT_POLL_SEC        300
+#define MIN_POLL_SEC            120
+#define MAX_POLL_SEC            900
 
 // ── Security ─────────────────────────────────────────────
 #define MAX_PIN_ATTEMPTS        10

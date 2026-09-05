@@ -3,7 +3,9 @@
  * SPDX-FileCopyrightText: 2026 oauramos
  *
  * Vendored from claude-usage-stick (github.com/oauramos/claude-usage-stick).
- * Unmodified.
+ * Modified: the refresh-interval options were 30/60/120/300 with 60 selected,
+ * which both contradicted DEFAULT_POLL_SEC and polled far harder than these
+ * endpoints tolerate. Now 120/300/600/900 with 300 selected.
  *
  * See docs/attribution.md.
  */
@@ -106,10 +108,10 @@ static const char SETUP_HTML[] PROGMEM = R"rawhtml(<!DOCTYPE html>
       <div class="field">
         <label for="poll_sec">Refresh interval</label>
         <select id="poll_sec" name="poll_sec">
-          <option value="30">30 sec</option>
-          <option value="60" selected>60 sec</option>
           <option value="120">2 min</option>
-          <option value="300">5 min</option>
+          <option value="300" selected>5 min</option>
+          <option value="600">10 min</option>
+          <option value="900">15 min</option>
         </select>
       </div>
       <div class="field">

@@ -53,6 +53,9 @@ reports on. Two minutes is the default interval.
 2. Build and flash. See [`docs/flashing.md`](docs/flashing.md), which covers
    what lands on the device and what it overwrites.
 
+   The full walk-through is [`docs/setup.md`](docs/setup.md); the short version
+   follows.
+
 3. On first boot the device has no config, so it opens its own WiFi network —
    `UsageChan-XXXX`, with the password shown on screen. Join it from a phone or
    laptop; the captive portal opens at `http://192.168.4.1`. Enter your WiFi
@@ -93,6 +96,10 @@ src/
   certs.*            │
   app_state.h       ─┘
 docs/
+  setup.md          first-time setup, start to finish
+  using.md          living with it: controls, config, failure states
+  design-decisions.md  what this is for, and why it isn't other things
+  data-inventory.md what the device can and cannot ever know
   display-notes.md  why the screen is black on old library versions
   hardware-notes.md buttons, Grove ports, what's actually on the face
   flashing.md       what gets written to the device, and how
