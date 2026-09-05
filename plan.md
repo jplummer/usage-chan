@@ -28,16 +28,17 @@ installed via pipx, so `pio` is at `~/.local/bin/pio`.
 
 ### 2026-09-04 — The black screen was a version problem, not a reset problem
 The plan's hypothesis was wrong. The AW9523 LCD reset is already in M5GFX and
-always was, which is why the manual toggles in issue 199 changed nothing. The
-real cause: these units ship an **ILI9342E** panel, both variants answer the ID
-read with 0xE3, and M5GFX before 0.2.27 sent ILI9342C init commands to it.
+always was, which is why the manual toggles in issue 199 changed nothing.
 
-`M5.begin()` is sufficient on **M5GFX >= 0.2.27**. M5GFX is pinned separately
-from M5Unified in `platformio.ini` because M5Unified's own floor is only
-`>= 0.2.10`, which resolves to a version that renders nothing. Full write-up in
-`docs/display-notes.md`.
+Corrected 2026-09-05: issue 199 is answered by the M5GFX maintainers, and their
+diagnosis is a version *pairing* mismatch (M5GFX >= 0.2.21 with M5Unified
+<= 0.2.14, giving backlight-off). This project separately found the ILI9342E
+init-list route added in 0.2.27, which is real in the source but not proven to
+be what anyone hit. `docs/display-notes.md` now separates the two honestly.
 
-Not verified on hardware. Diagnosis order for a black first boot is in that doc.
+What holds regardless: pin M5GFX explicitly rather than resolving it through
+M5Unified, whose manifest requires only `>= 0.2.10`. Verified working on
+hardware with 0.2.28 / 0.2.21.
 
 ### 2026-09-04 — No A/B/C buttons, and the virtual ones are off-screen
 The board has two physical buttons — reset underneath and soft power on the side
@@ -81,6 +82,29 @@ of it now, audio buffers will need more.
 
 ---
 
+### 2026-09-04 — First flash succeeded
+Booted, provisioned, drawing live bars. The M5GFX >= 0.2.27 diagnosis holds on
+real hardware, which was the one thing that could only be confirmed here.
+
+Rough edge found in use: getting the token into the captive portal is awkward,
+because joining the device's AP means leaving the network the token is on. It
+worked, but it's the worst moment in the setup and worth a fix — see parked
+ideas.
+
+### 2026-09-04 — Numbers verified against a second source
+Readings agree with openUsage running on the Mac. That closes the question of
+whether the undocumented response headers mean what every project assumes they
+mean: two independent readers, same numbers.
+
+Still worth a few days of watching. A single agreeing sample says the parse is
+right; it doesn't say the headers will keep arriving, which is what the visible
+failure state exists for.
+
+### 2026-09-04 — Published
+Public repo, MIT, warts and all.
+
+---
+
 ## Phase 1 – match claude-usage-stick
 - [x] PlatformIO project on `m5stack-cores3`, git initialised
 - [x] Display gotcha researched before writing any UI code (`docs/display-notes.md`)
@@ -93,6 +117,61 @@ of it now, audio buffers will need more.
 - [x] **It works.** Live usage bars on the device, first flash
 - [x] Numbers cross-checked against openUsage on the Mac — they agree
 - [ ] Run it for a few real days and watch for drift, or for the headers going away
+
+## Phase 1.5 – make it livable
+
+Phase 1 works but is awkward to live with. Everything here is about the parts
+you touch, not the parts that compute. Ordered by how much pain each removes
+per hour of work.
+
+### Port the LAN settings panel
+
+claude-usage-stick already has this, in `panel.cpp` and `panel_html.h` (~1,100
+lines, MIT). It was dropped when reducing to the single-screen path, and it is
+the single largest win available.
+
+It serves a control panel over the home WiFi at `http://<devicename>.local` or
+the IP. The login is the same 4-digit PIN, and logging in **also unlocks the
+device**, so you type the PIN in a browser instead of tapping a digit up to
+36 times. It carries brightness, refresh interval, timezone, device name,
+screen flip, WiFi switching, and a factory reset armed by typing `ERASE`.
+
+The part that matters most: it can **replace the stored token without a factory
+reset** — it re-encrypts, swaps live, and test-drives the new token against the
+API for a verified/failed verdict. That closes the token-expiry problem, which
+otherwise arrives in a year as a dead device.
+
+Porting cost is mostly the parts of `panel.cpp` that reference upstream's
+carousel, history and news screens, none of which exist here. The panel needs
+`panelService()` pumped from `loop()` and from inside every blocking boot wait.
+
+### Smooth out first setup
+
+Four things went wrong in practice, in order of severity:
+
+1. **Joining the setup AP drops you off the internet**, so the token has to
+   already be on your clipboard before you switch networks. Nothing on screen
+   or in the portal says so. This was the worst moment in the flow.
+2. **The AP password has to be read off the screen and typed into a phone.**
+3. **PIN entry is up to 36 taps** — ten per digit worst case, plus confirms.
+4. **After setup, nothing tells you where the device is on the LAN.** Moot until
+   the panel exists, then immediately relevant.
+
+`M5GFX` has `lcd.qrcode()` built into `LGFXBase`, so a QR code costs no library
+and no meaningful flash. That makes fixes 2 and 4 nearly free:
+
+- A **WiFi join QR** on the setup screen, encoding
+  `WIFI:T:WPA;S:UsageChan-A3F2;P:K7M2QRST;;`. iOS and Android camera apps join a
+  network directly from that format. Deletes the typing step.
+- A **portal URL QR** for `http://192.168.4.1` once joined.
+- A line at the top of the portal page: *copy your token before joining this
+  network*. One sentence in `provision.cpp`'s HTML, and it is the cheapest fix
+  of the four.
+- Later, the device's LAN address as a QR on the dashboard, once there is
+  something at that address worth reaching.
+
+Fix 3 is largely solved by the panel (type the PIN in a browser), and fully
+solved by an on-screen keypad — see parked ideas.
 
 ## Phase 2 (optional) – Stack-Chan's own capabilities
 - Swap the plain bars for a face through M5Stack-Avatar, expression driven by five-hour utilization and burn rate
@@ -107,34 +186,38 @@ of it now, audio buffers will need more.
 - **Voice.** CoreS3 has a mic and speaker, and M5Unified exposes both — no BSP needed. Realistic shape is record → ship audio to a service → play the answer, not on-device wake word plus STT. That is a much larger project than phase 1 and pulls in an API key, a second endpoint, and a real audio task. Design constraints it imposes are already honoured (see the decision log)
 - Explicitly out of scope: dollar spend and Claude Code git or session analytics. That data lives in local logs and git history on the Mac, not anywhere the ESP32 can reach on its own – it would need a host relay like Clawdmeter's, which phase one deliberately avoids
 
-### 2026-09-04 — First flash succeeded
-Booted, provisioned, drawing live bars. The M5GFX >= 0.2.27 diagnosis holds on
-real hardware, which was the one thing that could only be confirmed here.
-
-Rough edge found in use: getting the token into the captive portal is awkward,
-because joining the device's AP means leaving the network the token is on. It
-worked, but it's the worst moment in the setup and worth a fix — see parked
-ideas.
-
 ## Parked ideas
+
+### Refresh as a visible, tappable object
+Make the poll interval legible instead of invisible. A small indicator that ebbs
+away as the interval runs down, becomes a spinner while the fetch is in flight,
+and refills when it completes. The same object is the refresh control: tap it to
+pull the next poll forward.
+
+Two things this earns beyond looking nice. It answers *is this thing alive* with
+no separate liveness indicator, which the current "updated 47s ago" line does
+only weakly. And it makes the honest cost visible — every poll is a real API
+call that spends a sliver of the budget being displayed — by showing that a
+manual refresh consumes something that was filling up on its own.
+
+Open question: whether it lives on screen, on `M5.BtnPWR`, or both. Both is
+probably right, since the physical button is the one input that does not put a
+fingerprint on the display.
+
+### A settings menu on the device
+The panel needs a phone, and reaching for a phone to dim a screen you are
+sitting in front of is silly. A button-opened menu covering brightness, refresh
+interval, and a manual refresh would cover the common tweaks locally. Reads as
+complementary to the panel, not competing with it.
+
+### The rest
+
 - **Ease the token handoff.** Joining the setup AP drops your phone or laptop off the internet, so the token has to be already copied before you switch networks. A QR code on the device pointing at `http://192.168.4.1`, and a note on the setup page telling you to copy the token first, would cover most of the pain
 - **Use `M5.BtnPWR`.** A real physical input sitting unused. "Refresh now" fits it, and would free the middle touch zone
 - **A real PIN keypad.** Four digits at one-tap-per-increment is up to 36 taps. A 320x240 touchscreen can show ten targets; it just needs raw touch coordinates rather than the three-button abstraction
-- **Token expiry.** `claude setup-token` tokens last a year. The device should say so before it stops working, not after — the 401 path already reports `auth_failed`, but a countdown from a stored issue date would be kinder
+- **Token expiry.** `claude setup-token` tokens last a year. Largely solved by the panel's token replacement; a countdown from a stored issue date would still warn before the device simply stops
 - **Sleep or dim on a schedule.** A lit 320x240 panel on a nightstand at 2am is a lot
 - **Poll less when idle.** Utilization that hasn't moved in an hour doesn't need a 2-minute poll, and every poll spends the budget it reports on
-
-### 2026-09-04 — Numbers verified against a second source
-Readings agree with openUsage running on the Mac. That closes the question of
-whether the undocumented response headers mean what every project assumes they
-mean: two independent readers, same numbers.
-
-Still worth a few days of watching. A single agreeing sample says the parse is
-right; it doesn't say the headers will keep arriving, which is what the visible
-failure state exists for.
-
-### 2026-09-04 — Published
-Public repo, MIT, warts and all.
 
 ## Open questions
 - Nothing blocking. Next real work is phase 2, or the parked ideas above
