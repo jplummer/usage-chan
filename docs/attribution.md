@@ -2,7 +2,8 @@
 
 The whole project is MIT. So is everything it borrows, which keeps the story
 short: the only obligation anywhere is to carry the copyright notices, and
-`LICENSE` carries both. This file is the map of which file came from where, so
+`LICENSE` carries both — Jon Plummer for the code written here, oauramos for
+the files listed below. This file is the map of which file came from where, so
 the credit is legible rather than buried in a header.
 
 ## Vendored from claude-usage-stick (MIT, © 2026 oauramos)
