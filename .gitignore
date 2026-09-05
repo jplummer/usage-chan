@@ -1,0 +1,14 @@
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+.vscode/
+.clangd
+compile_commands.json
+
+# Upstream clones kept for reading, not part of this repo.
+# See docs/attribution.md for what came from where.
+reference/
+
+# macOS
+.DS_Store
