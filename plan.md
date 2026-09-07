@@ -124,8 +124,25 @@ Public repo, MIT, warts and all.
 ## Phase 1.5 – make it livable
 
 Phase 1 works but is awkward to live with. Everything here is about the parts
-you touch, not the parts that compute. Ordered by how much pain each removes
-per hour of work.
+you touch, not the parts that compute.
+
+It has grown into four tracks. They are listed in build order, and the ordering
+is mostly forced by dependency rather than preference.
+
+| Track | What | Depends on |
+|---|---|---|
+| **A · On-device polish** | Refresh clock · menu with statuses and legend · PIN screen rework · timezone | Nothing. In progress |
+| **B · Setup, the cheap half** | QR to join the AP · "copy your token first" warning · drop claude-usage-stick branding from reworked screens | Nothing |
+| **C · LAN panel** | Settings, token replacement, PIN in a browser — *and* deferred token entry, which is the expensive half of setup | Nothing, but it is the big one |
+| **D · Follow-ons** | OTA · Claude service status · currency symbol | C hosts OTA; status wants its own fetch path |
+
+**Where the setup rework sits, since it keeps getting asked:** split across B and
+C. The cheap half is B and needs nothing — a QR code to join the network, and one
+sentence telling you to copy your token before you leave the internet. The
+expensive half is *asking for the token after the device is on your WiFi*, and
+that is really the LAN panel wearing a different hat, so it lands with C.
+
+Track A is currently in flight and is deliberately independent of all of it.
 
 ### Port the LAN settings panel
 
@@ -147,6 +164,20 @@ otherwise arrives in a year as a dead device.
 Porting cost is mostly the parts of `panel.cpp` that reference upstream's
 carousel, history and news screens, none of which exist here. The panel needs
 `panelService()` pumped from `loop()` and from inside every blocking boot wait.
+
+### Drop the inherited branding
+`provision.cpp` still presents itself as claude-usage-stick: the page title, the
+`<h1>`, and a footer reading *"Claude Usage Stick · made by @oauramos"*.
+
+That was accurate while the page was his, unmodified. It is already slightly
+untrue and will be plainly untrue once the page is reworked.
+
+**Correct the claim, keep the credit.** The footer should say the page is *based
+on* claude-usage-stick by @oauramos rather than that it *is* claude-usage-stick.
+Stripping the attribution while keeping the work would be the wrong fix; so is
+leaving a page that misrepresents whose product it is.
+
+Applies to any screen we rework, not just this one.
 
 ### Smooth out first setup
 
@@ -189,6 +220,18 @@ solved by an on-screen keypad — see parked ideas.
 - **Voice.** CoreS3 has a mic and speaker, and M5Unified exposes both — no BSP needed. Realistic shape is record → ship audio to a service → play the answer, not on-device wake word plus STT. That is a much larger project than phase 1 and pulls in an API key, a second endpoint, and a real audio task. Design constraints it imposes are already honoured (see the decision log)
 - Explicitly out of scope: dollar spend and Claude Code git or session analytics. That data lives in local logs and git history on the Mac, not anywhere the ESP32 can reach on its own – it would need a host relay like Clawdmeter's, which phase one deliberately avoids
 
+## Stubs and IOUs
+
+Things deliberately faked to keep moving, recorded so they are not mistaken for
+finished. Every entry here is a lie the device currently tells.
+
+| Stub | What it pretends | What it needs |
+|---|---|---|
+| Claude service status | The menu will report "no service issues" without asking anyone | The status-fetch design in `design-decisions.md`: detect with our own request outcomes, name with status.claude.com |
+| Reset times | Shown as durations, not wall clocks | A timezone. `tzMin` defaults to 0, which is a real offset rather than a marker for unknown, so the clock is gated behind `tzSet` |
+| Menu rows | "Refresh interval", "Network" and "Control panel" do nothing | Track C, mostly |
+| Extra usage | Never detected | Two more strings in `RL_HEADERS[]`, then the currency symbol |
+
 ## Parked ideas
 
 ### Refresh as a visible, tappable object
@@ -207,11 +250,24 @@ Open question: whether it lives on screen, on `M5.BtnPWR`, or both. Both is
 probably right, since the physical button is the one input that does not put a
 fingerprint on the display.
 
+### The legend as the real bar, annotated
+Rather than a diagram of a bar, show **the actual 5-hour bar with its actual
+current values**, and point at the pieces: this is your remaining budget, this
+diamond is where an even burn would have you, this edge is both running out and
+resetting.
+
+The appeal is vérité — the thing being explained is the thing itself, at the
+values you are looking at right now, so there is no translation step between the
+legend and the display.
+
+The risk is space. The bar is 288px wide on a 240px-tall screen, and leader lines
+to three or four callouts get cramped fast. Worth sketching before building; it
+either works immediately or it does not work at all.
+
 ### A settings menu on the device
 The panel needs a phone, and reaching for a phone to dim a screen you are
-sitting in front of is silly. A button-opened menu covering brightness, refresh
-interval, and a manual refresh would cover the common tweaks locally. Reads as
-complementary to the panel, not competing with it.
+sitting in front of is silly. **Decided: little or no menu-diving.** The menu is
+one screen carrying the statuses and the legend together, not a tree.
 
 ### Over-the-air updates
 The partition table already carries everything needed — `otadata` plus two 6.5 MB
