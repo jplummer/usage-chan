@@ -593,17 +593,18 @@ Poll it slowly (15–30 min) on top of the failure-triggered fetch, because a
 degraded **Claude Code** component can matter while the **API** component, and
 therefore our own fetches, stays perfectly healthy.
 
-## Refresh takes seconds, and blocks everything
+## Refresh takes ~2.7 seconds — measured
 
-Not measured on hardware yet. The estimate, from what the code does:
+**Measured on hardware 2026-09-07: 2622–2780 ms across ten consecutive
+fetches**, tightly clustered. The earlier estimate of 1–3 s was right, and the
+consistency matters as much as the figure: this is dominated by a full TLS
+handshake, not by variable server latency.
 
-| Stage | Estimate |
-|---|---|
-| DNS | ~0, usually cached |
-| TCP connect | 50–150 ms |
-| TLS handshake, full | 500 ms – 2 s |
-| Server-side inference (`max_tokens: 1`, Haiku) | 300–800 ms |
-| **Total** | **roughly 1–3 s** |
+**The spinner is therefore worth keeping.** Three seconds is plainly
+perceptible; without it the device would appear frozen every poll. It also
+settles the threading question retroactively — under the old blocking design
+that was 2.7 s of dead touch per poll, which tap-anywhere would have turned into
+an obviously broken device rather than a briefly slow one.
 
 Two things make the TLS handshake unavoidable every time. `fetchUsage()`
 constructs a fresh `WiFiClientSecure` on each call (`api.cpp:26`), so no session
@@ -651,8 +652,9 @@ This is also what makes the spinner honest: the tick can animate during a fetch
 *because the loop is still running*. On a blocked loop a spinner cannot spin,
 which is the tell that the whole idea needed this change first.
 
-To measure the real duration rather than estimate: wrap `https.POST()` in
-`millis()` deltas and log beside the existing `[API] HTTP %d` line.
+Measured by wrapping the fetch in `millis()` deltas, logged as
+`[FETCH] ok in NNNms`. Kept in place — it costs nothing and it is how the next
+regression here gets caught.
 
 ## Open questions
 

@@ -66,7 +66,7 @@ largest gap in the product today and the LAN settings panel is the fix — see
 | Setting | Range | Changeable now? |
 |---|---|---|
 | Brightness | 0–3 | Yes, left button |
-| Refresh interval | 2–15 min, default 5 | No |
+| Refresh interval | 2–15 min, default 5 | No — and a device provisioned before the floor changed sits at 2 min, clamped up from its stored value. Reaching 5 needs a re-provision |
 | WiFi credentials | | Only via the recovery portal, after three failed connects |
 | Token | | No. Factory reset only |
 | PIN | | No. Factory reset only |
@@ -116,7 +116,8 @@ confident stale number.
 | `reset unknown` under a bar | No reset time, or the clock has not synced | Should resolve within a minute of boot. NTP now retries with backoff and keeps trying in the background |
 | `--` instead of a percentage | No data at all this session | See the status line |
 
-A small spinner appears beside the status line while a fetch is in flight. It
+A fetch takes about **2.7 seconds**, measured on hardware. A small spinner
+appears beside the status line while one is in flight. It
 can turn at all because the fetch runs on the second core — the screen stays
 live throughout, including touch.
 
