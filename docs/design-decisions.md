@@ -408,6 +408,72 @@ The clock rung is worth its own line of code. Without it, every failed handshake
 gets blamed on the network and the actual remedy — resync NTP — never suggests
 itself.
 
+### Exhaust our own remedies before spending the user's attention
+
+The table above is a *diagnosis* ladder, not a messaging one. Nothing in it
+should reach the screen until the device has tried to fix it and failed for a
+sustained period.
+
+- **NTP.** `syncTime()` currently calls `getLocalTime(&t, 5000)` and **discards
+  the return value**, so a boot where NTP does not answer inside five seconds
+  proceeds silently with an epoch near zero — countdowns break and every TLS
+  handshake fails cert validation. It should retry with backoff, keep retrying in
+  the background (a device up for hours may get an answer later), and only then
+  say anything. *This is live in the shipped firmware.*
+- **DHCP / association.** `WiFi.setAutoReconnect(true)` and an explicit
+  reconnect attempt come first.
+- **First boot is not failure.** No clock yet on a cold start is *"syncing…"*,
+  not an error.
+
+A message the user cannot act on is worse than silence. Say something only when
+we have run out of moves and they have one.
+
+## Status headline bar
+
+When there is an unresolved incident, a coloured bar appears at the bottom
+carrying the incident **headline**, inviting a tap to read the latest update.
+Zero pixels when there is nothing — which is nearly always.
+
+This slots between "small glyph" and "full overlay" on the invalidation ladder,
+and it carries *content* rather than merely a state.
+
+**Where the fields come from.** `incidents/unresolved.json` gives `name` (the
+headline) and `impact`, both stable — it is the `incident_updates[]` array nested
+inside that churns minute by minute. Take the title, ignore the stream.
+
+**The churny data becomes acceptable on tap**, because the user asked for it at
+that moment. `incident_updates[0].body` is exactly right for a detail view and
+exactly wrong for an ambient one.
+
+### Severity, including the quiet rung
+
+| `impact` | Treatment |
+|---|---|
+| `major_outage` | Red bar |
+| `partial_outage` | Amber bar |
+| `degraded_performance` | **Included, but quiet** — dim bar, no colour pop |
+| `none` | Nothing |
+
+Degraded performance is visible to Claude users in their own work, so hiding it
+would make the device look oblivious. It just does not warrant the same volume.
+
+## WiFi — three states, and only two of them show
+
+| State | On screen | In the menu |
+|---|---|---|
+| Good enough | Nothing | Full detail: SSID, RSSI, IP |
+| Weak | Arc glyph, corner | Same detail |
+| No WiFi | Smoke overlay | Same detail |
+
+Detail always lives in the menu; the screen speaks only when it must. Keep the
+main thing the main thing.
+
+*Open:* RSSI is a proxy for "will fetches work." Once fetch durations are being
+timed, a slow or retried fetch is better evidence of a weak link than a dBm
+reading. RSSI is free and instantaneous where fetch history is five minutes
+apart, so likely both — RSSI to display, fetch history to corroborate.
+
+
 ## Service status — detect with our own requests, name with the status page
 
 **Our own fetch outcomes are first-hand evidence about the exact endpoint we
