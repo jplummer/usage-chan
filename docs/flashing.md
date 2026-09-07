@@ -105,8 +105,17 @@ clock it, so the number is something both ends agree to ignore while data moves
 at USB speed anyway. Asking esptool to renegotiate to 1.5 Mbaud asks the device
 to do something meaningless, and it does not answer afterwards.
 
-`platformio.ini` sets no `upload_speed` for exactly this reason. Removing it
-costs nothing: the transfer was never limited by that number on this board.
+**Deleting `upload_speed` does not fix this.** PlatformIO then falls back to the
+board definition, and `boards/m5stack-cores3.json` carries `"speed": 921600` —
+so the renegotiation still happens, just to a different number.
+
+`platformio.ini` therefore states `upload_speed = 115200` explicitly. That exact
+value works because it is esptool's own `ESP_ROM_BAUD`, and the renegotiation is
+guarded by `if args.baud > initial_baud:` — an equal value skips `change_baud()`
+altogether rather than performing a harmless-looking no-op.
+
+It costs no upload time. The image still moves at USB speed; the baud number was
+never what limited it here.
 
 Watch it boot:
 
