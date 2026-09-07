@@ -232,6 +232,21 @@ genuinely hard to recover. The dual-slot layout is what protects against that,
 so any implementation must roll back on a failed boot rather than overwrite in
 place.
 
+### The week strip (backlog)
+Seven segments, one per day, showing consumption per day with today in progress.
+It would answer the one question nothing else here can — *is this week unusual?*
+— and it is buildable: the device samples 7-day utilization every five minutes
+and discards every sample, where seven daily snapshots is 28 bytes of NVS. No
+API offers this, and the desktop tools that show a trend need your Mac's session
+logs, so it would be genuinely ours.
+
+**Parked as too fragile for now.** The interesting work is not the strip, it is
+designing every way it degrades: a device flashed four days ago, a device that
+was unplugged for two of the seven days, a window that reset mid-sample, a boot
+with no clock so samples cannot be dated. Each needs a defined appearance, and
+getting any of them wrong produces a chart that lies. Worth doing deliberately
+later rather than accidentally now.
+
 ### The rest
 
 - **Ease the token handoff.** Joining the setup AP drops your phone or laptop off the internet, so the token has to be already copied before you switch networks. A QR code on the device pointing at `http://192.168.4.1`, and a note on the setup page telling you to copy the token first, would cover most of the pain

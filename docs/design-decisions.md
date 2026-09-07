@@ -310,11 +310,75 @@ of them.
 **Leaning (d), the diamond**, with (b) the notch as the alternative. The stroke
 spends ten pixels of height the bar would rather have.
 
-### Still open
+### The 7-day window gets a line, not a bar
 
-The 5-hour and 7-day windows want *opposite* treatments — the short one guards
-against end-of-window burn, the long one against hoarding — and this spec
-currently gives them the same one.
+Decided 2026-09-07. The two windows want opposite treatments and were getting
+identical ones.
+
+The 7-day window moves 1% per 100 minutes, so a bar for it is seen hundreds of
+times per window and looks identical nearly every time — the definition of the
+wallpaper an ambient display gets tuned out and then unplugged for. Its action is
+also diffuse: being ahead of pace means moderating for *days*, with no moment to
+act at. And it is the **hoarding** window — uncertain future demand plus costly
+exhaustion, the conditions that produce a safety buffer nobody ever spends.
+
+So by default it is one quiet line, no bar and no percentage:
+
+```
+7-DAY   behind pace · resets Friday
+```
+
+It becomes a full pace bar — the same geometry as the 5-hour one — only when it
+is genuinely the binding constraint. The API says which: the
+`representative-claim` header was `five_hour` 77% of the time and `seven_day` 23%
+in a 37,000-request capture. Collecting it costs **one more string in
+`RL_HEADERS[]`** in `api.cpp`, on a response already being parsed.
+
+That makes the screen show *the limit that will stop you*, which is the
+conceptual model this project already chose. Presence graded by relevance, the
+same way message size is graded by invalidation.
+
+Accepted cost: the layout changes shape occasionally. It has to pass the same
+test as the single colour threshold — rare, and always for a reason.
+
+### Words assert, marks compare
+
+An earlier draft read `comfortable to Friday`. That predicts a **result**, which
+is why it wanted `at your current pace` bolted on, which is too long to glance at.
+
+The fix is a deletion. State the pace, state the reset, and leave the last step —
+trivial arithmetic — to the reader:
+
+- `behind pace` · `on pace` · `ahead of pace`
+
+These describe **now**, not Friday, so they are provisional without a hedge.
+They are shorter than what they replace, and they are the vocabulary the tick
+already embodies.
+
+A word asserts a conclusion and therefore needs qualifying. A mark shows a
+relationship and lets the reader conclude, which is why the pace tick never
+needed an "approximately".
+
+### Reset labels: planning register, then urgency register
+
+Wall clock and duration answer different questions. *"Resets at 3:40pm"* is what
+you compare against a calendar — the planning register, and the one the
+range-anxiety finding is actually about. *"Resets in 12m"* is urgency, and is
+better only once the answer is imminent.
+
+| Distance | 5-hour | 7-day |
+|---|---|---|
+| Plenty | `resets 3:40pm` | `resets Friday` |
+| Closing | `resets 3:40pm` | `resets Fri 1pm` |
+| Imminent | `resets in 12m` | `resets in 4h` |
+
+### Personality stays out of this layer
+
+The functional line is terse and has no voice. The Chan-ness is icing, so it goes
+*on top* rather than stirred in — a face has room for personality, an 11px status
+line does not, and every character spent on charm there is spent against
+glanceability. Phase 2's expression can be as warm as it likes precisely because
+the text under it reads plainly.
 
 ## The PIN — reconsidered
 
