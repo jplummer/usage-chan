@@ -117,6 +117,13 @@ explicitly. Removing it lets esptool's own default apply.
 
 It is not slow. A 1.19MB image writes in about 11 seconds at ~890 kbit/s.
 
+It is, however, chatty. The ROM writes in 1KB blocks where the stub uses larger
+ones, and esptool rewrites its progress line in place only when stdout is a TTY
+— which it is not, under PlatformIO. So 1.19MB used to print about **1,170 lines
+of `Writing at 0x...`**. `scripts/upload_filter.py` runs esptool and collapses
+those into one updating line, falling back to a print every 10% when its own
+output is piped rather than shown.
+
 #### Dies at "Changing baud rate"
 
 ```

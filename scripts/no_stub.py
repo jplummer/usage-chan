@@ -33,4 +33,16 @@ Import("env")
 
 flags = [f for f in env.get("UPLOADERFLAGS", []) if f != "-z"]
 env.Replace(UPLOADERFLAGS=["--no-stub"] + flags)
+
+# --no-stub has a cosmetic cost worth undoing. The ROM writes in 1KB blocks
+# where the stub uses larger ones, and esptool only rewrites its progress line
+# in place when stdout is a TTY — which it is not, under PlatformIO. 1.19MB of
+# firmware therefore prints about 1,170 lines of "Writing at 0x...".
+#
+# upload_filter.py runs esptool and collapses those into one updating line.
+env.Replace(
+    UPLOADCMD='"$PYTHONEXE" "$PROJECT_DIR/scripts/upload_filter.py" '
+              '"$PYTHONEXE" "$UPLOADER" $UPLOADERFLAGS $ESP32_APP_OFFSET $SOURCE'
+)
+
 print("upload: --no-stub, compression off (see scripts/no_stub.py)")
