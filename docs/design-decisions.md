@@ -264,6 +264,29 @@ resolves what looked like a contradiction:
 Precision moves from the thing you cannot control to the thing that is certain.
 The posture is *"you're getting close, but don't worry, it resets in 1h38m."*
 
+### Screen composition — chrome removed
+
+Decided 2026-09-07. The phase 1 screen spent **62 of 240 pixels — 26%** on
+chrome: a 26px title stripe reading "USAGE-CHAN", and a 36px button row reading
+"DIM / REFRESH". Both are gone.
+
+- **No title stripe.** The device does not need to tell you its name every
+  second of every day. The space may eventually carry a mascot, appearing after
+  some period of use or not at all — but it is content's until then, not
+  chrome's.
+- **No button row.** Tap anywhere to open a menu. That frees the whole height
+  and removes the need for `M5.setTouchButtonHeight()`, since the menu reads raw
+  touch coordinates rather than the three synthesised zones.
+- **The menu is not PIN-protected.** Brightness, refresh interval, and the LAN
+  panel's address are all safe to expose to anyone standing at the device. The
+  PIN guards the panel, which is where the destructive operations live.
+- **Reset time moves to the right end of the bar**, because the right edge *is*
+  the reset moment. The label now names the thing its position encodes, and the
+  geometry explains itself.
+- **Signal strength appears only when poor** — below roughly −75 dBm, where it
+  starts to affect a fetch. Drawn as a fan rather than bars, so it can never be
+  misread as a second gauge. Keep the main thing the main thing.
+
 ### Tick treatment
 
 Three candidates, all evaluated at the hard case — tick within a pixel or two of
@@ -274,11 +297,18 @@ the block edge:
 - **(b) triangular notch**, point up, cut into the lower edge. Reads at
   coincidence, unmistakably a different kind of mark from the block edge, and
   stays inside the bar's footprint.
-- **(c) centre dot**, block edge passing it on both sides. Quietest, but at
-  coincidence it is half-swallowed by the fill it sits on.
+- **(c) centre dot**, block edge passing it on both sides. Quietest, but a
+  circle claims an *area* where the thing it marks is a *position*.
+- **(d) centre diamond** — the dot sharpened to points on the axis that matters.
+  Same footprint, more specific about exactly where it sits.
 
-**Leaning (b).** It survives coincidence, costs no vertical space, and cannot be
-mistaken for the edge it sits beside. Not final.
+All four work once each carries a **one-pixel halo in the background colour**,
+which is what lets a mark hold its shape against the dark track and against any
+fill colour it overlaps. That was the dot's real problem, and it applies to all
+of them.
+
+**Leaning (d), the diamond**, with (b) the notch as the alternative. The stroke
+spends ten pixels of height the bar would rather have.
 
 ### Still open
 
@@ -331,6 +361,41 @@ token's age, so replacing it is routine rather than an emergency.
 Rejected: deriving the key from the eFuse instead of a PIN. It would keep the
 obfuscation and lose the panel credential, which is the part that turned out to
 matter.
+
+## Refresh takes seconds, and blocks everything
+
+Not measured on hardware yet. The estimate, from what the code does:
+
+| Stage | Estimate |
+|---|---|
+| DNS | ~0, usually cached |
+| TCP connect | 50–150 ms |
+| TLS handshake, full | 500 ms – 2 s |
+| Server-side inference (`max_tokens: 1`, Haiku) | 300–800 ms |
+| **Total** | **roughly 1–3 s** |
+
+Two things make the TLS handshake unavoidable every time. `fetchUsage()`
+constructs a fresh `WiFiClientSecure` on each call (`api.cpp:26`), so no session
+is reused. And `CA_BUNDLE` carries three roots, all offered to the verifier.
+At a five-minute cadence that waste is affordable, but it is the dominant cost.
+
+**The problem is not the duration, it is that `loop()` is stuck for it.**
+`refresh()` calls `fetchUsage()` synchronously, so for those seconds the device
+reads no touch, redraws nothing, and updates no countdown. `API_TIMEOUT_MS` is
+15,000 — so a hung network freezes the device for **fifteen seconds**.
+
+Phase 1 hid this: with three labelled button zones and a screen that changes
+slowly, a brief freeze is invisible. **Tap-anywhere-for-menu removes that cover.**
+A tap during a fetch does nothing, with no feedback, which reads as a broken
+device rather than a busy one.
+
+So the fetch needs to stop blocking the interface, or to visibly announce
+itself, before the menu lands. Which is what the pace-tick-as-spinner idea was
+already reaching for: the tick becomes a spinner while a fetch is in flight, and
+the refresh cost becomes legible instead of being a mystery freeze.
+
+To measure it rather than estimate: wrap the `https.POST()` in `millis()` deltas
+and log alongside the existing `[API] HTTP %d` line. One flash, real numbers.
 
 ## Open questions
 
