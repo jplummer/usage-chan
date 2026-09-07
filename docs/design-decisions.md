@@ -383,29 +383,67 @@ screen.
 to darken the region rather than a blended fill. A solid lozenge is the fallback
 and costs nothing to read.
 
-## Service status — fetch it on failure, not on a schedule
+## Diagnosing failure — measure, don't infer
 
-`status.claude.com/api/v2/status.json` needs no authentication and is ~212 bytes.
-Notably, OpenUsage does *nothing* with it — a static hyperlink and no fetching —
-so this is new ground rather than copied.
+**Corrected 2026-09-07.** An earlier draft concluded that a failed usage fetch
+plus a failed status fetch meant the local network was down. That is not sound.
+Both failing is equally consistent with an ISP outage, a DNS failure, a shared
+CDN problem, a captive portal wanting re-authentication, or — the sneaky one — a
+**device clock so far off that every TLS handshake fails certificate
+validation**, which is what an NTP failure looks like from the outside.
 
-**The trick is when to ask.** Rather than adding a second periodic request, ask
-status.claude.com *only when a usage fetch fails*. That costs nothing while
-things work, and it turns a useless error into a real one:
+The fix is not better inference. It is measuring the thing directly. Only the
+first rung below is genuinely "no WiFi", and it is observable for free:
 
-| Usage fetch | Status fetch | Conclusion |
+| Observation | Conclusion | Treatment |
 |---|---|---|
-| fails | succeeds | It's Claude. Say which component and how badly |
-| fails | also fails | It's your network. Show the offline overlay |
-| succeeds | — | Don't ask |
+| `WiFi.status() != WL_CONNECTED` | Not associated with the AP | Full overlay — the only rung that earns it |
+| Associated, no DHCP lease | Network is up, we are not on it | Overlay, different wording |
+| `time(nullptr)` implausibly small | Clock unset; TLS will fail everywhere | *"clock not set"* — never "no network" |
+| DNS resolution fails | Something beyond the AP | Its own message |
+| status.claude.com reachable, API not | It is Anthropic | Service line |
+| Both reachable, call returns an error | Auth or plan problem | Existing error states |
 
-The second row is the valuable one: two failures that look identical from one
-endpoint become distinguishable from two. `no data: http_-1` becomes either
-*"Claude API — major outage"* or *"no network"*.
+The clock rung is worth its own line of code. Without it, every failed handshake
+gets blamed on the network and the actual remedy — resync NTP — never suggests
+itself.
 
-A slow background poll (every 15–30 min) is still worth adding on top, because a
-degraded **Claude Code** component can matter while the **API** component — and
-therefore our fetch — is perfectly healthy.
+## Service status — detect with our own requests, name with the status page
+
+**Our own fetch outcomes are first-hand evidence about the exact endpoint we
+care about, arriving every five minutes at no extra cost.** The status page is
+second-hand. So the roles are:
+
+- **Detect** with our own request history. Two consecutive failures is evidence;
+  one is noise.
+- **Name and confirm** with status.claude.com — *is it them, and how bad* — not
+  *is something wrong*.
+
+This also fixes the latency problem: we are never more than one poll behind,
+because noticing does not depend on Anthropic's publishing cadence.
+
+### Reading it without flickering
+
+status.claude.com posts minute-by-minute updates during an incident. Tracking
+that churn would make the *device* the unreliable thing, which is the same
+failure mode the alarm literature describes for a threshold that fires too
+often — a state that blinks trains people to stop seeing it.
+
+- **Do not read `incident_updates[]`.** That is the churny stream. Read
+  `components.json`, whose per-component `status` moves far less.
+- **Filter to the two components that matter**: *Claude API (api.anthropic.com)*
+  and *Claude Code*. The global `indicator` in `status.json` is stabler still but
+  goes amber for a degraded claude.ai web app, which is irrelevant to CLI work.
+- **Require two consecutive observations** before changing displayed state, in
+  either direction.
+- **Gate on severity.** `major_outage` and `partial_outage` earn the line;
+  `degraded_performance` gets something quieter or nothing.
+- **Show duration, not state.** *"degraded 20m"* is more useful than a light, and
+  a duration cannot blink — it either exists or it does not.
+
+Poll it slowly (15–30 min) on top of the failure-triggered fetch, because a
+degraded **Claude Code** component can matter while the **API** component, and
+therefore our own fetches, stays perfectly healthy.
 
 ## Refresh takes seconds, and blocks everything
 
