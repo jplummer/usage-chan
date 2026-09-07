@@ -86,7 +86,38 @@ CoreS3 resets into download mode on its own; no button holding. If it does not,
 hold the power button on the left side for about 5 seconds to force a reset and
 retry.
 
-### If it fails at "Changing baud rate"
+### Two upload failures this board actually has
+
+Both were hit on the first real flash. Both are fixed in `platformio.ini`, and
+both are recorded here because the symptoms look like broken hardware and are
+not.
+
+#### Dies right after "Stub running..."
+
+```
+Stub running...
+A fatal error occurred: Unable to verify flash chip connection
+                        (No serial data received.).
+```
+
+esptool normally uploads a small flasher "stub" into RAM and hands control to
+it. On this board the stub takes over the ESP32-S3's native USB peripheral, and
+esptool 4.5.1 does not reliably survive that handover — the stub starts and is
+never heard from again.
+
+`--no-stub` skips it and talks to the ROM bootloader instead, which is already
+running and cannot fail to hand over. `scripts/no_stub.py` adds the flag, and
+`platformio.ini` loads it as a **post** script — `builder/main.py` sets
+`UPLOADERFLAGS` with `env.Replace()`, so a `pre:` script's contribution is
+discarded.
+
+That script also strips `-z`. esptool disables compression under `--no-stub` by
+default, but only when the flag was not set explicitly, and PlatformIO sets it
+explicitly. Removing it lets esptool's own default apply.
+
+It is not slow. A 1.19MB image writes in about 11 seconds at ~890 kbit/s.
+
+#### Dies at "Changing baud rate"
 
 ```
 Stub running...
@@ -114,8 +145,10 @@ value works because it is esptool's own `ESP_ROM_BAUD`, and the renegotiation is
 guarded by `if args.baud > initial_baud:` — an equal value skips `change_baud()`
 altogether rather than performing a harmless-looking no-op.
 
-It costs no upload time. The image still moves at USB speed; the baud number was
-never what limited it here.
+It costs no upload time, and this is now measured rather than argued: the image
+transfers at about **890 kbit/s** while nominally set to 115200 baud — roughly
+7.7× what that rate could physically carry. The number is ignored, and the link
+runs at USB speed.
 
 Watch it boot:
 
