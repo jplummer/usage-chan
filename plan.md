@@ -1,4 +1,4 @@
-# usage-chan — Claude usage monitor on a Stack-Chan
+# Usage-Chan — Claude usage monitor on a Stack-Chan
 
 ## Goal
 Turn an already-owned Stack-Chan (M5Stack CoreS3) into a standalone desk device
