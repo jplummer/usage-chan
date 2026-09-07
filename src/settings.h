@@ -3,7 +3,8 @@
  * SPDX-FileCopyrightText: 2026 oauramos
  *
  * Vendored from claude-usage-stick (github.com/oauramos/claude-usage-stick).
- * Unmodified.
+ * Modified: Settings gains a tzSet flag. tzMin defaults to 0, which is a real
+ * offset (UTC) rather than a marker for "unknown", so it cannot double as one.
  *
  * See docs/attribution.md.
  */

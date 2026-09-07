@@ -129,7 +129,15 @@ The device should never show a confident number it cannot stand behind.
 Established practice worth copying from OpenUsage:
 
 - **A failed fetch keeps the last good values** and marks them stale. It does not
-  blank them. *usage-chan does not do this yet — known gap.*
+  blank them. *Built 2026-09-07.* Two timestamps, deliberately separated: the age
+  on screen counts from the last **success**, never the last attempt, because
+  every freshness claim depends on success while only the retry schedule cares
+  about attempts. Merging them meant a failure reset the counter and the device
+  reported freshness it did not have.
+- **Staleness is stated in words, not signalled by a colour.** A small element
+  changing hue is too quiet a channel for "your numbers are old". The status line
+  says `14m old — can't refresh (http_-1)`: age first, because the numbers are
+  what the reader came for, then the reason.
 - **A missing field omits its row** rather than rendering zero.
 - **"No data" is not "0".** A confident zero is indistinguishable from "nothing
   has been recorded yet", and contradicts a live meter that says otherwise.

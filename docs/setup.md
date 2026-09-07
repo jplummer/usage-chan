@@ -64,7 +64,7 @@ does not, go to **http://192.168.4.1**.
 | Password | Leave empty for an open network |
 | OAuth token | The `sk-ant-oat01-` string you copied |
 | Encryption PIN | Exactly four digits |
-| Refresh interval | Default 5 minutes. See "Why five minutes" in [`using.md`](using.md) |
+| Refresh interval | Default 5 minutes. See "Why five minutes" in [`using.md`](using.md). A device provisioned before the floor moved falls back to this default rather than keeping a stale value |
 | Screen brightness | Changeable later |
 | Device name | Cosmetic today; will become the device's `.local` hostname when the LAN panel lands |
 
@@ -91,8 +91,9 @@ so a stubborn network delays the countdowns rather than wedging the device.
 
 ## 5. Check it
 
-Two bars, two countdowns, a status line reading "updated Ns ago". Cross-check
-the numbers against `claude /usage` on your Mac, or OpenUsage if you run it.
+One bar with a diamond on it, a seven-day line underneath, and a status line.
+Cross-check the numbers against `claude /usage` on your Mac, or OpenUsage if you
+run it. [`using.md`](using.md) explains what the diamond means.
 
 ## When setup goes wrong
 

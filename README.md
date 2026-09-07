@@ -2,13 +2,22 @@
 
 A Stack-Chan that shows how much of your Claude rate-limit budget is left.
 
-It sits on a desk, polls `api.anthropic.com` every couple of minutes, and draws
-two bars: the five-hour window and the seven-day window, each with a countdown
-to when it resets. No host computer, no org API key, no Mac daemon relaying
-over Bluetooth. The device does it alone.
+It sits on a desk, polls `api.anthropic.com` every five minutes, and answers one
+question: *can I start this now, or should I wait?* No host computer, no org API
+key, no Mac daemon relaying over Bluetooth. The device does it alone.
 
-Phase 1 is plain numbers and bars. No face, no servo, nothing from Stack-Chan's
-own firmware. `plan.md` has the phases and the ideas parked for later.
+The bar is the **window**, not the budget. Its right edge is both exhaustion and
+reset — you race toward it either way, and the only question is which arrives
+first. A diamond marks where an even burn would have you, so the gap between the
+diamond and the bar's edge is the whole reading: behind pace is calm however
+little remains, ahead of pace is worth knowing.
+
+The seven-day window is one quiet line underneath, growing into a full bar only
+when the server says it is the limit that will actually stop you.
+
+No face and no servo yet. `plan.md` has the phases, and `docs/design-decisions.md`
+has the reasoning — including the behavioural research that argued against
+several things this device used to do.
 
 ## Hardware
 
@@ -75,10 +84,13 @@ reports on. Two minutes is the default interval.
 
 ## Using it
 
+**Tap anywhere on the dashboard** to open the menu; tap outside its rows to
+close. PIN entry and boot still use three zones along the bottom 36 pixels,
+labelled on the screens that use them.
+
 | Screen | Left third | Middle third |
 |---|---|---|
 | PIN entry | next digit | confirm digit |
-| Dashboard | cycle brightness | refresh now |
 | Boot | hold both for 2s → factory reset | |
 
 ## Layout

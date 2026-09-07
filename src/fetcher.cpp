@@ -21,9 +21,15 @@ static TaskHandle_t      s_task  = nullptr;
 static SemaphoreHandle_t s_mutex = nullptr;
 
 // Published result. Only ever written inside s_mutex.
+//
+// Two timestamps, deliberately. s_lastGoodMs backs every freshness claim on
+// screen; s_lastAttemptMs would back a retry schedule. Merging them was a bug:
+// a failed fetch reset the "updated Ns ago" counter, so the device reported
+// freshness it did not have.
 static UsageData     s_usage{};
-static unsigned long s_lastFetchMs = 0;
-static uint32_t      s_lastDurMs   = 0;
+static unsigned long s_lastGoodMs = 0;
+static uint32_t      s_lastDurMs  = 0;
+static char          s_lastError[64] = {0};
 
 // Written by the worker, read by the render loop. A plain bool is adequate:
 // aligned 32-bit reads and writes are atomic on this core, and nothing branches
@@ -52,9 +58,17 @@ static void fetchTask(void*) {
         uint32_t dur = millis() - t0;
 
         xSemaphoreTake(s_mutex, portMAX_DELAY);
-        s_usage       = local;
-        s_lastFetchMs = millis();
-        s_lastDurMs   = dur;
+        if (local.ok) {
+            // Only success replaces the published reading.
+            s_usage      = local;
+            s_lastGoodMs = millis();
+            s_lastError[0] = '\0';
+        } else {
+            // Keep whatever was there. The values stay true; only their age
+            // changes, and fetcherAgeSec() is what tells the screen about that.
+            strlcpy(s_lastError, local.error, sizeof(s_lastError));
+        }
+        s_lastDurMs = dur;
         xSemaphoreGive(s_mutex);
 
         s_busy = false;
@@ -78,14 +92,21 @@ bool fetcherBusy() { return s_busy; }
 
 uint32_t fetcherLastDurationMs() { return s_lastDurMs; }
 
-void fetcherSnapshot(UsageData& out, unsigned long& lastFetchMsOut) {
-    if (!s_mutex) { out = s_usage; lastFetchMsOut = s_lastFetchMs; return; }
+int32_t fetcherAgeSec() {
+    if (s_lastGoodMs == 0) return -1;
+    return (int32_t)((millis() - s_lastGoodMs) / 1000UL);
+}
+
+const char* fetcherLastError() { return s_lastError; }
+
+void fetcherSnapshot(UsageData& out, unsigned long& lastGoodMsOut) {
+    if (!s_mutex) { out = s_usage; lastGoodMsOut = s_lastGoodMs; return; }
     // A short timeout rather than portMAX_DELAY: the render loop must never be
     // the thing that blocks. Missing one frame's update is free — the previous
     // frame's values are still on screen and still correct.
     if (xSemaphoreTake(s_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
         out            = s_usage;
-        lastFetchMsOut = s_lastFetchMs;
+        lastGoodMsOut  = s_lastGoodMs;
         xSemaphoreGive(s_mutex);
     }
 }

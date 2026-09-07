@@ -100,7 +100,7 @@ largest gap in the product today and the LAN settings panel is the fix — see
 | Setting | Range | Changeable now? |
 |---|---|---|
 | Brightness | 0–3 | Yes, left button |
-| Refresh interval | 2–15 min, default 5 | No — and a device provisioned before the floor changed sits at 2 min, clamped up from its stored value. Reaching 5 needs a re-provision |
+| Refresh interval | 2–15 min, default 5 | No — but a stored value from before the floor moved is treated as stale and falls back to the 5-minute default, so no re-provision is needed to get there |
 | WiFi credentials | | Only via the recovery portal, after three failed connects |
 | Token | | No. Factory reset only |
 | PIN | | No. Factory reset only |
@@ -131,8 +131,10 @@ but the setup portal had 60 pre-selected, and the portal won. Devices set up
 before the fix made 1,440 calls a day.
 
 **Flashing the new firmware repairs them**, and your token, PIN and WiFi survive
-it — a stored interval below the floor is clamped up on the first boot after the
-update. There is no over-the-air update, so this means a USB-C cable. Getting
+it. A stored interval outside the current range is treated as stale — a value
+written against a schema that no longer exists is not information — so it falls
+back to the default rather than clamping to the nearest legal number, which
+would have left a device at 2 minutes that nobody chose. There is no over-the-air update, so this means a USB-C cable. Getting
 all the way to 300s needs a re-provision, which today means a factory reset.
 
 ## When something is wrong
@@ -143,9 +145,10 @@ confident stale number.
 | Status line | Meaning | What to do |
 |---|---|---|
 | `updated 12s ago` | Normal | Nothing |
-| `no data: auth_failed` | Token rejected — usually expired | Re-run `claude setup-token`, factory reset, set up again |
-| `no data: no_usage_h_200` | Authenticated, but this plan publishes no usage headers | Expected on Enterprise and API-billed accounts. Nothing to fix |
-| `no data: http_-1` and similar | Network or TLS failure | Usually transient. Check WiFi |
+| `Nm old — can't refresh (auth_failed)` | Token rejected — usually expired | Re-run `claude setup-token`, factory reset, set up again |
+| `Nm old — can't refresh (no_usage_h_200)` | Authenticated, but this plan publishes no usage headers | Expected on Enterprise and API-billed accounts. Nothing to fix |
+| `Nm old — can't refresh (http_-1)` | Network or TLS failure | Usually transient. Check WiFi |
+| `no reading yet — retrying` | Failed before ever succeeding, so there is nothing to keep | Check WiFi and token |
 | `waiting for first reading` | Booted, nothing fetched yet | Normal for the first few seconds |
 | `reset unknown` under a bar | No reset time, or the clock has not synced | Should resolve within a minute of boot. NTP now retries with backoff and keeps trying in the background |
 | `--` instead of a percentage | No data at all this session | See the status line |
@@ -155,9 +158,16 @@ appears beside the status line while one is in flight. It
 can turn at all because the fetch runs on the second core — the screen stays
 live throughout, including touch.
 
-**Known gap:** a failed fetch still replaces the last good numbers rather than
-keeping them with a staleness note. Good clients keep the last reading and mark
-it stale. Worth fixing.
+**A failed fetch keeps the numbers.** They were true when they arrived and they
+are still worth reading — they are just old, and the status line says how old:
+
+```
+14m old — can't refresh (http_-1)
+```
+
+Two facts in that order, because the numbers are what you came for. Only a
+successful fetch resets the age; "updated 20s ago" never means "we tried 20
+seconds ago".
 
 ## Things it deliberately does not show
 

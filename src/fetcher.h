@@ -31,9 +31,20 @@ void fetcherRequest();
 // Drives the spinner.
 bool fetcherBusy();
 
-// Copies the last published result. Safe to call from the render loop at any
-// time; never tears, never blocks for long.
-void fetcherSnapshot(UsageData& out, unsigned long& lastFetchMsOut);
+// Copies the last GOOD result, plus when it arrived. A failed fetch does not
+// overwrite it — numbers that were true three minutes ago are still worth more
+// than "--", they are just old, and the caller is told how old.
+void fetcherSnapshot(UsageData& out, unsigned long& lastGoodMsOut);
+
+// Seconds since the last SUCCESSFUL fetch, or -1 if there has never been one.
+// This is deliberately not "since the last attempt": every freshness claim on
+// screen depends on success, while only the retry schedule cares about attempts.
+int32_t fetcherAgeSec();
+
+// The most recent failure's reason, or an empty string if the last attempt
+// succeeded. Non-empty alongside good data means exactly one thing: the numbers
+// are real but stale.
+const char* fetcherLastError();
 
 // Milliseconds the last completed fetch took, or 0 if none has finished.
 // Kept because "how long does a refresh take?" deserved a measurement rather

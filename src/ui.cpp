@@ -7,6 +7,7 @@
 #include "config.h"
 #include <Arduino.h>
 #include <time.h>
+#include "fetcher.h"
 
 // ── Drawing target ────────────────────────────────────────
 // Everything is composed into an off-screen sprite and pushed in one write, so
@@ -448,17 +449,35 @@ void uiDashboard(const UsageData& data, unsigned long lastFetchMs, int rssi,
         drawSevenDayLine(174, data);
     }
 
-    // Failure is graded by how much of the screen it makes untrue. This is the
-    // quiet rung: everything above is still correct, we just could not refresh.
+    // Failure is graded by how much of the screen it makes untrue, and staleness
+    // is stated here in words rather than implied by a colour somewhere small.
+    // A number that was right twelve minutes ago is still worth reading; the
+    // reader just has to know it is twelve minutes old.
     g->setFont(&fonts::Font2);
     g->setTextDatum(top_left);
-    if (lastFetchMs == 0 && !data.ok) {
+
+    const int32_t age = fetcherAgeSec();
+    const char*   err = fetcherLastError();
+
+    if (age < 0) {
         g->setTextColor(C_DIM, C_BG);
-        g->drawString("waiting for first reading", 16, 216);
-    } else if (!data.ok) {
-        g->setTextColor(C_CRIT, C_BG);
-        char sline[48];
-        snprintf(sline, sizeof(sline), "no data: %s", data.error);
+        g->drawString(err[0] ? "no reading yet — retrying" : "waiting for first reading",
+                      16, 216);
+    } else {
+        char sline[64];
+        char ago[16];
+        if (age < 90) snprintf(ago, sizeof(ago), "%ds", (int)age);
+        else          snprintf(ago, sizeof(ago), "%dm", (int)(age / 60));
+
+        if (err[0]) {
+            // Stale: real numbers, failing refresh. Both facts, in that order,
+            // because the numbers are what the reader came for.
+            snprintf(sline, sizeof(sline), "%s old — can't refresh (%s)", ago, err);
+            g->setTextColor(C_WARN, C_BG);
+        } else {
+            snprintf(sline, sizeof(sline), "updated %s ago", ago);
+            g->setTextColor(C_DIM, C_BG);
+        }
         g->drawString(sline, 16, 216);
     }
 
