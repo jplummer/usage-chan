@@ -100,6 +100,7 @@ the numbers against `claude /usage` on your Mac, or OpenUsage if you run it.
 |---|---|
 | Black screen, backlight on | Library version problem, not your fault. See [`display-notes.md`](display-notes.md) |
 | Nothing on the serial monitor | CoreS3 uses native USB, so the port only appears once firmware runs. An empty monitor means it did not get that far — re-run the upload and watch for an esptool error |
+| Upload dies at "Changing baud rate" | A stale `upload_speed` on a native-USB board. Nothing was written; reset and see [`flashing.md`](flashing.md) |
 | "WIFI FAILED", then the setup network reappears | Wrong password, or a 5 GHz network. The device falls back to a WiFi-only portal that keeps your token |
 | `no data: auth_failed` | Token rejected. Most likely expired — tokens last a year |
 | `no data: no_usage_h_200` | Authenticated fine, but this plan does not publish usage headers. Real on Enterprise and API-billed accounts |

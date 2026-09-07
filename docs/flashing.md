@@ -86,6 +86,28 @@ CoreS3 resets into download mode on its own; no button holding. If it does not,
 hold the power button on the left side for about 5 seconds to force a reset and
 retry.
 
+### If it fails at "Changing baud rate"
+
+```
+Stub running...
+Changing baud rate to 1500000
+A fatal error occurred: No serial data received.
+```
+
+**Nothing was written.** That failure happens after the stub loads into RAM and
+before any flash write, so the device still holds its previous firmware. Reset
+or power-cycle and it comes back.
+
+The cause is a stale `upload_speed`. CoreS3 uses the ESP32-S3's **native USB** —
+its port is `/dev/cu.usbmodem*`, not `usbserial`, because there is no UART
+bridge chip. On native USB CDC the baud rate is fiction: no UART exists to
+clock it, so the number is something both ends agree to ignore while data moves
+at USB speed anyway. Asking esptool to renegotiate to 1.5 Mbaud asks the device
+to do something meaningless, and it does not answer afterwards.
+
+`platformio.ini` sets no `upload_speed` for exactly this reason. Removing it
+costs nothing: the transfer was never limited by that number on this board.
+
 Watch it boot:
 
 ```bash
