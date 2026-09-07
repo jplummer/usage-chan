@@ -192,6 +192,13 @@
       Tick right means burning faster than the window carries — the one state
       worth a colour change.</dd>
 
+      <dt>the headline and the clock trade places</dt>
+      <dd>Above 40% left the big number is the budget and the reset is a
+      footnote. Below it they swap — because the decision has changed from
+      <em>should I start this?</em> to <em>should I wait?</em>, and the second
+      one is answered by a clock. The bar keeps carrying the amount throughout,
+      which is the honest way to be imprecise about it.</dd>
+
       <dt>the 7-day window is a line, not a bar</dt>
       <dd>It moves 1% per 100 minutes, so a bar for it is seen hundreds of times
       per window and looks identical nearly every time — wallpaper. It promotes
@@ -246,13 +253,16 @@
             <path d="M ${x} ${cy-r} L ${x+r} ${cy} L ${x} ${cy+r} L ${x-r} ${cy} Z" fill="${c}"/>`;
   }
 
-  // Precision migrates: the overspendable figure coarsens as the window closes,
-  // the reset clock sharpens, because it is reassurance not a spending signal.
-  function figureFor(rem){
-    if(rem < 15) return 'nearly out';
-    if(rem < 35) return 'about a third left';
-    return Math.round(rem)+'% left';
-  }
+  // Precision migrates by SWAPPING the two quantities between slots, not by
+  // fuzzing the number. An earlier draft said "about a third left" across a
+  // 15-35% band, which is wrong by a factor of two at the bottom of its own
+  // range — a point estimate wearing a disguise. The bar was already the range.
+  //
+  // Above the crossover the headline is the budget and the clock is the
+  // footnote. Below it they trade places: what you need big late in a window is
+  // when you get more, because the decision has changed from "should I start?"
+  // to "should I wait?".
+  const CROSSOVER = 40;
   // Planning register while there is planning to do; urgency register only when
   // the answer is imminent. The 7-day window's "imminent" is still hours away,
   // so it stays a wall clock — "in 4h" is vaguer than "1:07pm", and arguably
@@ -266,19 +276,29 @@
   function block(y,label,u,e,txtFar,txtNear,txtNow,treat){
     const edge=BX+BW*u, tx=BX+BW*e, col=barColor(u,e);
     const rem=(1-u)*100;
+    const plenty = rem >= CROSSOVER;
+
+    // Headline slot and footnote slot trade contents at the crossover.
+    const headline = plenty ? Math.round(rem)+'% left'
+                            : resetFor(rem, txtFar, txtNear, txtNow).replace(/^resets /,'');
+    const footnote = plenty ? resetFor(rem, txtFar, txtNear, txtNow)
+                            : (rem < 12 ? 'nearly out' : '');
+
     return `
       <text x="${BX}" y="${y+10}" fill="${D.dim}" font-family="monospace"
             font-size="10" letter-spacing="1.1">${label}</text>
-      <text x="${BX+BW}" y="${y+13}" fill="${D.text}" font-family="sans-serif"
-            font-size="19" font-weight="700" text-anchor="end">${figureFor(rem)}</text>
+      <text x="${BX+BW}" y="${y+13}" fill="${plenty ? D.text : D.accent}"
+            font-family="sans-serif" font-size="19" font-weight="700"
+            text-anchor="end">${headline}</text>
 
       <rect x="${BX}" y="${y+26}" width="${BW}" height="${BH}" rx="4" fill="${D.card}"/>
       <rect x="${edge}" y="${y+26}" width="${Math.max(BW-BW*u,0)}" height="${BH}"
             rx="4" fill="${col}"/>
       ${tick(tx, y+26, BH, treat)}
 
-      <text x="${BX+BW}" y="${y+62}" fill="${D.dim}" font-family="monospace"
-            font-size="11" text-anchor="end">${resetFor(rem,txtFar,txtNear,txtNow)}</text>`;
+      <text x="${BX+BW}" y="${y+62}" fill="${rem<12?D.warn:D.dim}"
+            font-family="monospace" font-size="11"
+            text-anchor="end">${footnote}</text>`;
   }
 
   // The standard WiFi glyph: a dot with concentric arcs radiating upward.

@@ -250,19 +250,37 @@ it never jumps, never revises, needs no model, and cannot be wrong.
 **The bar empties instead of filling**, so it invents no completion goal for goal
 gradient to accelerate toward.
 
-### Precision migrates from the budget to the clock
+### Precision migrates by swapping slots, not by fuzzing the number
 
-The two quantities move in opposite directions as a window tightens, and this
-resolves what looked like a contradiction:
+**Corrected 2026-09-07.** An earlier draft coarsened the budget figure into
+words: `34% left` → `about a third left` → `nearly out`. That was a
+misreading of the evidence and it shipped a bug.
 
-- **The budget** is the thing that can be overspent, and precision provably
-  causes overspending. It gets **vaguer**: `34% left` → `about a third left` →
-  `nearly out`.
-- **The reset time** is reassurance, not a spending signal. It gets **sharper**:
-  `resets soon` → `resets in 1h38m`.
+The research finding was that showing a **range** (`€20–€60` rather than `€40`)
+reversed the overspending. A range is honest about its bounds. *"About a third
+left"* is not a range — it is a point estimate wearing a disguise, spanning
+15–35% and therefore **wrong by a factor of two at the bottom of its own band**.
 
-Precision moves from the thing you cannot control to the thing that is certain.
-The posture is *"you're getting close, but don't worry, it resets in 1h38m."*
+Two things follow.
+
+**The bar was already the range.** A filled length is read approximately by
+nature and cannot overclaim. Layering vague words on top added no imprecision the
+geometry did not already provide, and added a way to be wrong.
+
+**Precision migrates by the two quantities trading places.** Follow the rule to
+its conclusion and there is a crossover, because the *question* changes:
+
+| Remaining | Headline slot | Footnote slot | Decision being made |
+|---|---|---|---|
+| ≥ 40% | `62% left` | `resets 3:40pm` | *Should I start this?* |
+| < 40% | `3:40pm` | — (or `nearly out` below 12%) | *Should I wait?* |
+
+Late in a window the number worth making big is not how much is left — it is
+when you get more. The bar keeps carrying the amount throughout, which is the
+honest way to be imprecise about it.
+
+`nearly out` survives below 12%, because it claims **proximity** rather than a
+fraction. That is a warning, not a quantity, and cannot be wrong by 2×.
 
 ### Screen composition — chrome removed
 
