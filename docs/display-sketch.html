@@ -139,7 +139,15 @@
             <button data-t="diamond" aria-pressed="true">diamond</button>
           </div>
         </div>
-        <label class="check"><input type="checkbox" id="weak"> weak signal (RSSI −82)</label>
+        <div class="ctl">
+          <label>Device state</label>
+          <div class="seg" id="stateseg">
+            <button data-s="ok" aria-pressed="true">normal</button>
+            <button data-s="weak" aria-pressed="false">weak</button>
+            <button data-s="service" aria-pressed="false">issue</button>
+            <button data-s="offline" aria-pressed="false">offline</button>
+          </div>
+        </div>
         <div class="verdict" id="verdict"></div>
       </div>
     </div>
@@ -182,9 +190,15 @@
       Tick right means burning faster than the window carries — the one state
       worth a colour change.</dd>
 
-      <dt>signal appears only when it matters</dt>
-      <dd>A fan, not bars, so it never reads as a second gauge. Hidden entirely
-      above −75 dBm.</dd>
+      <dt>a message is as big as what it invalidates</dt>
+      <dd>Weak signal costs you nothing but latency, so it is a small glyph.
+      A Claude service issue means your numbers are right and your work is still
+      blocked, so it gets its own line. No network means nothing on screen can be
+      trusted, so it covers everything.</dd>
+
+      <dt>the WiFi mark is arcs, never bars</dt>
+      <dd>Bars beside the pace bars would read as a second gauge. Hidden entirely
+      above −75 dBm, where signal stops affecting a fetch.</dd>
     </dl>
   </section>
 
@@ -251,36 +265,68 @@
             font-size="11" text-anchor="end">${resetFor(rem,txtFar,txtNear)}</text>`;
   }
 
-  // Fan, not bars — it must never read as a second gauge. Only drawn when the
-  // signal is poor enough to actually affect a fetch.
-  function signalFan(){
-    return `<g transform="translate(300,222)" fill="none" stroke="${D.warn}" stroke-width="1.6">
-              <path d="M -9 0 A 9 9 0 0 1 9 0" opacity="0.25"/>
-              <path d="M -5.5 0 A 5.5 5.5 0 0 1 5.5 0" opacity="0.55"/>
-              <path d="M -2 0 A 2 2 0 0 1 2 0"/>
-            </g>
-            <text x="286" y="226" fill="${D.warn}" font-family="monospace"
-                  font-size="10" text-anchor="end">weak</text>`;
+  // The standard WiFi glyph: a dot with concentric arcs radiating upward.
+  // Deliberately NOT bar-shaped — bars would read as a second gauge next to
+  // the pace bars. `cut` draws the slashed variant for "no network".
+  function wifi(x,y,scale,color,cut){
+    const r=[3.6,6.8,10.0].map(v=>v*scale), k=0.7071;
+    const arcs=r.map(v=>
+      `<path d="M ${-v*k} ${-v*k} A ${v} ${v} 0 0 1 ${v*k} ${-v*k}"
+             fill="none" stroke="${color}" stroke-width="${1.7*scale}"
+             stroke-linecap="round"/>`).join('');
+    const dot=`<circle cx="0" cy="0" r="${1.5*scale}" fill="${color}"/>`;
+    const slash = cut
+      ? `<line x1="${-9*scale}" y1="${2*scale}" x2="${9*scale}" y2="${-14*scale}"
+              stroke="${D.bg}" stroke-width="${4.4*scale}" stroke-linecap="round"/>
+         <line x1="${-9*scale}" y1="${2*scale}" x2="${9*scale}" y2="${-14*scale}"
+              stroke="${color}" stroke-width="${1.9*scale}" stroke-linecap="round"/>`
+      : '';
+    return `<g transform="translate(${x},${y})">${arcs}${dot}${slash}</g>`;
   }
 
-  function screen(u,e,treat,weak){
-    return `<rect width="320" height="240" fill="${D.bg}"/>`
+  // A service issue is a different KIND of fact from usage: your numbers may be
+  // fine and your work still blocked. Marked, not merged into the bars.
+  function serviceBadge(){
+    return `<g transform="translate(16,222)">
+      <circle cx="5" cy="-4" r="5" fill="${D.warn}"/>
+      <rect x="4.1" y="-7" width="1.8" height="4.2" fill="${D.bg}"/>
+      <rect x="4.1" y="-1.6" width="1.8" height="1.8" fill="${D.bg}"/>
+      <text x="16" y="0" fill="${D.warn}" font-family="monospace" font-size="10">
+        Claude API degraded</text></g>`;
+  }
+
+  // The overlay scales with how much of the screen it invalidates. No network
+  // invalidates everything, so it covers everything.
+  function smoke(){
+    return `<rect width="320" height="240" fill="${D.bg}" opacity="0.78"/>
+      <rect x="52" y="74" width="216" height="92" rx="12"
+            fill="${D.card}" opacity="0.97" stroke="${D.dim}" stroke-opacity="0.35"/>
+      ${wifi(160,124,2.2,D.dim,true)}
+      <text x="160" y="152" fill="${D.dim}" font-family="monospace" font-size="11"
+            text-anchor="middle">no network</text>`;
+  }
+
+  function screen(u,e,treat,state){
+    let out = `<rect width="320" height="240" fill="${D.bg}"/>`
       + block(30, '5-HOUR',  u,      e,      'resets in 2h 24m', 'resets in 1h 38m', treat)
-      + block(128,'7-DAY',   u*0.55, e*0.62, 'resets in 4d 6h',  'resets in 2d 1h',  treat)
-      + (weak ? signalFan() : '');
+      + block(128,'7-DAY',   u*0.55, e*0.62, 'resets in 4d 6h',  'resets in 2d 1h',  treat);
+    if(state==='weak')    out += wifi(300,224,1.0,D.warn,false);
+    if(state==='service') out += serviceBadge();
+    if(state==='offline') out += smoke();
+    return out;
   }
 
   const dev=document.getElementById('dev');
   const util=document.getElementById('util'), elapsed=document.getElementById('elapsed');
   const utilv=document.getElementById('utilv'), elapsedv=document.getElementById('elapsedv');
-  const verdict=document.getElementById('verdict'), weak=document.getElementById('weak');
-  let treat='diamond';
+  const verdict=document.getElementById('verdict');
+  let treat='diamond', state='ok';
 
   function render(){
     const u=util.value/100, e=elapsed.value/100;
     utilv.textContent=util.value+'%';
     elapsedv.textContent=elapsed.value+'%';
-    dev.innerHTML=screen(u,e,treat,weak.checked);
+    dev.innerHTML=screen(u,e,treat,state);
 
     const gap=Math.round((u-e)*BW);
     let msg;
@@ -293,7 +339,12 @@
 
   util.addEventListener('input',render);
   elapsed.addEventListener('input',render);
-  weak.addEventListener('change',render);
+  document.getElementById('stateseg').addEventListener('click',ev=>{
+    const b=ev.target.closest('button'); if(!b) return;
+    state=b.dataset.s;
+    [...ev.currentTarget.children].forEach(x=>x.setAttribute('aria-pressed',x===b));
+    render();
+  });
   document.getElementById('seg').addEventListener('click',ev=>{
     const b=ev.target.closest('button'); if(!b) return;
     treat=b.dataset.t;

@@ -362,6 +362,51 @@ Rejected: deriving the key from the eFuse instead of a PIN. It would keep the
 obfuscation and lose the panel credential, which is the part that turned out to
 matter.
 
+## Failure is graded by how much it invalidates
+
+Decided 2026-09-07. A message should be as big as the amount of screen it makes
+untrue. Four rungs:
+
+| State | What is still true | Treatment |
+|---|---|---|
+| Weak signal | Everything. Fetches are just slower | Small WiFi glyph, bottom right. Below ~−75 dBm only |
+| Stale data | The numbers were true, and are ageing | Keep the last good reading, mark it stale. Never blank it |
+| Claude degraded | Your numbers are right — and your work is still blocked | Its own line. A different *kind* of fact from usage |
+| No network | Nothing on screen can be trusted | Full-screen overlay. It borks everything, so it covers everything |
+
+**The WiFi mark is arcs radiating from a dot — never bars.** Bars sitting beside
+the pace bars would read as a second gauge. The no-network variant is the same
+glyph with a slash, shown large inside a translucent lozenge over a dimmed
+screen.
+
+*Implementation note:* true translucency on a 16-bit sprite may need a pixel walk
+to darken the region rather than a blended fill. A solid lozenge is the fallback
+and costs nothing to read.
+
+## Service status — fetch it on failure, not on a schedule
+
+`status.claude.com/api/v2/status.json` needs no authentication and is ~212 bytes.
+Notably, OpenUsage does *nothing* with it — a static hyperlink and no fetching —
+so this is new ground rather than copied.
+
+**The trick is when to ask.** Rather than adding a second periodic request, ask
+status.claude.com *only when a usage fetch fails*. That costs nothing while
+things work, and it turns a useless error into a real one:
+
+| Usage fetch | Status fetch | Conclusion |
+|---|---|---|
+| fails | succeeds | It's Claude. Say which component and how badly |
+| fails | also fails | It's your network. Show the offline overlay |
+| succeeds | — | Don't ask |
+
+The second row is the valuable one: two failures that look identical from one
+endpoint become distinguishable from two. `no data: http_-1` becomes either
+*"Claude API — major outage"* or *"no network"*.
+
+A slow background poll (every 15–30 min) is still worth adding on top, because a
+degraded **Claude Code** component can matter while the **API** component — and
+therefore our fetch — is perfectly healthy.
+
 ## Refresh takes seconds, and blocks everything
 
 Not measured on hardware yet. The estimate, from what the code does:
@@ -394,8 +439,34 @@ itself, before the menu lands. Which is what the pace-tick-as-spinner idea was
 already reaching for: the tick becomes a spinner while a fetch is in flight, and
 the refresh cost becomes legible instead of being a mystery freeze.
 
-To measure it rather than estimate: wrap the `https.POST()` in `millis()` deltas
-and log alongside the existing `[API] HTTP %d` line. One flash, real numbers.
+### Move the fetch off the render loop
+
+There is no reason to block. The ESP32-S3 is dual-core, Arduino's `loop()` runs
+pinned to core 1, and core 0 is idle.
+
+- `xTaskCreatePinnedToCore()` a fetch task on core 0. It waits on a
+  notification, fetches into a **local** `UsageData`, then copies into the shared
+  one under a mutex.
+- `loop()` keeps drawing, keeps reading touch, keeps counting down. It reads an
+  atomic `g_fetching` flag to drive the spinner.
+- The 15-second timeout stops mattering, because nothing waits on it.
+
+Two things this breaks that must be handled rather than discovered:
+
+**The no-locking assumption.** `app_state.h` carries an upstream comment —
+*"everything runs on the single Arduino loop task, so no locking is needed"* —
+which becomes false. It needs a mutex and an updated comment.
+
+**Stack sizing.** An mbedTLS handshake wants roughly 8–16 KB of task stack, and
+underestimating it produces a reboot rather than an error. Budget 16 KB; there is
+room, with internal RAM at 15.8% of 320 KB.
+
+This is also what makes the spinner honest: the tick can animate during a fetch
+*because the loop is still running*. On a blocked loop a spinner cannot spin,
+which is the tell that the whole idea needed this change first.
+
+To measure the real duration rather than estimate: wrap `https.POST()` in
+`millis()` deltas and log beside the existing `[API] HTTP %d` line.
 
 ## Open questions
 
