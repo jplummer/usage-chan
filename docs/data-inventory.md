@@ -213,7 +213,7 @@ hourly from GitHub Pages, LiteLLM and models.dev:
 - Per-model spend breakdown
 
 There is no Anthropic endpoint behind any of it. This is a hard boundary on
-what usage-chan can ever be, and it is worth knowing before designing toward a
+what Usage-Chan can ever be, and it is worth knowing before designing toward a
 number that cannot arrive.
 
 Also local, perhaps surprisingly: the **plan name** ("Max 20x") comes from the

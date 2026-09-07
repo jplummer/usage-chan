@@ -1,4 +1,4 @@
-# usage-chan
+# Usage-Chan
 
 A Stack-Chan that shows how much of your Claude rate-limit budget is left.
 

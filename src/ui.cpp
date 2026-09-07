@@ -270,7 +270,7 @@ void uiBootProgress(int percent, const char* label) {
     g->setFont(&fonts::FreeSansBold18pt7b);
     g->setTextDatum(middle_center);
     g->setTextColor(C_ACCENT, C_BG);
-    g->drawString("usage-chan", SCREEN_W / 2, 82);
+    g->drawString("Usage-Chan", SCREEN_W / 2, 82);
 
     g->setFont(&fonts::Font2);
     g->setTextColor(C_DIM, C_BG);
@@ -518,7 +518,7 @@ void uiMenu(int highlight) {
     g->setFont(&fonts::Font2);
     g->setTextDatum(top_left);
     g->setTextColor(C_DIM, C_BG);
-    g->drawString("usage-chan " FW_VERSION, MENU_X, 18);
+    g->drawString("Usage-Chan " FW_VERSION, MENU_X, 18);
     g->setTextDatum(top_right);
     g->drawString("tap outside to close", MENU_X + MENU_W, 18);
 

@@ -12,7 +12,7 @@ A build produces four artifacts, and `pio run -t upload` writes all four:
 | `0x0000` | `bootloader.bin` | ~15 KB | ESP32-S3 second-stage bootloader |
 | `0x8000` | `partitions.bin` | 3 KB | The partition table, from `default_16MB.csv` |
 | `0xe000` | `boot_app0.bin` | 8 KB | OTA selector, points at the first app slot |
-| `0x10000` | `firmware.bin` | ~1.19 MB | usage-chan |
+| `0x10000` | `firmware.bin` | ~1.19 MB | Usage-Chan |
 
 The app is 18% of its 6.5 MB slot, so a face and a servo driver in phase 2 fit
 without touching the partition table.

@@ -1,4 +1,4 @@
-# Living with usage-chan
+# Living with Usage-Chan
 
 *Living document. Updated whenever behaviour or configuration changes — if this
 drifts from what the device does, that is a bug in the document. Last checked

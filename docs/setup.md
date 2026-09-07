@@ -1,4 +1,4 @@
-# Setting up usage-chan
+# Setting up Usage-Chan
 
 *Living document. Updated whenever the setup flow changes — if this drifts from
 what the device does, that is a bug in the document. Last checked against
