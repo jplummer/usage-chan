@@ -436,12 +436,16 @@ void uiDashboard(const UsageData& data, unsigned long lastFetchMs, int rssi,
     // so most of the time the 5-hour window gets the display to itself.
     const bool sevenBinds = data.ok && strncmp(data.claim, "seven_day", 9) == 0;
 
+    // Vertical placement. Content ran 56..200 against a 240px panel, leaving
+    // 56 above and 40 below — visibly bottom-heavy. Shifted up 12px, which also
+    // nudges past geometric centre: the bar carries the visual mass, and optical
+    // centre for a heavy element sits slightly above the middle.
     if (sevenBinds) {
-        drawWindowBar(28,  "5-HOUR", data.h5, data.h5ResetEpoch, WIN_5H, data.ok);
-        drawWindowBar(130, "7-DAY",  data.d7, data.d7ResetEpoch, WIN_7D, data.ok);
+        drawWindowBar(22,  "5-HOUR", data.h5, data.h5ResetEpoch, WIN_5H, data.ok);
+        drawWindowBar(122, "7-DAY",  data.d7, data.d7ResetEpoch, WIN_7D, data.ok);
     } else {
-        drawWindowBar(62, "5-HOUR", data.h5, data.h5ResetEpoch, WIN_5H, data.ok);
-        drawSevenDayLine(186, data);
+        drawWindowBar(50, "5-HOUR", data.h5, data.h5ResetEpoch, WIN_5H, data.ok);
+        drawSevenDayLine(174, data);
     }
 
     // Failure is graded by how much of the screen it makes untrue. This is the

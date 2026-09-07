@@ -247,6 +247,34 @@ with no clock so samples cannot be dated. Each needs a defined appearance, and
 getting any of them wrong produces a chart that lies. Worth doing deliberately
 later rather than accidentally now.
 
+### Currency symbol past the right edge
+When extra-usage billing is active, a currency symbol sitting just **beyond the
+right edge of the 5-hour bar**. The geography already carries the meaning: the
+right edge is exhaustion, so a symbol past it says *past here, it costs money*
+without a word of explanation.
+
+Reachable from the header probe we already make — `overage-status` and
+`overage-utilization` are in the same unified family, two more strings in
+`RL_HEADERS[]`. No second request.
+
+### On-device menu vs web panel — the split
+Decided by what each can be trusted with. The on-device menu is unauthenticated,
+so it is **read-mostly**: status you can look at, one harmless control, and a
+pointer to the thing that does the rest. The web panel is PIN-gated, so it holds
+everything destructive or sensitive.
+
+| On device (no PIN) | Web panel (PIN) |
+|---|---|
+| WiFi status | WiFi network and password |
+| Claude service status | API token replacement |
+| Brightness | PIN change |
+| **Key** — what the colours and the diamond mean | Refresh interval |
+| How to reach the web panel | Timezone, device name |
+
+The key is the interesting one: a legend for a display that deliberately has no
+labels on it. Somewhere to answer "what is the diamond?" once, without spending
+pixels on the dashboard answering it forever.
+
 ### The rest
 
 - **Ease the token handoff.** Joining the setup AP drops your phone or laptop off the internet, so the token has to be already copied before you switch networks. A QR code on the device pointing at `http://192.168.4.1`, and a note on the setup page telling you to copy the token first, would cover most of the pain
