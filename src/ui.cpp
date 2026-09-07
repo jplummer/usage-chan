@@ -43,120 +43,182 @@ static void initPalette() {
     C_CRIT   = lcd.color565(0xD9, 0x56, 0x4F);
 }
 
-// Bands are deliberately generous at the low end. A 5-hour window at 55% is
-// not worth alarming about; at 85% it is.
-static uint16_t barColor(float pct) {
-    if (pct >= 85.0f) return C_CRIT;
-    if (pct >= 60.0f) return C_WARN;
+// Colour comes from the RELATIONSHIP between spend and elapsed time, not from
+// the level. Behind pace reads calm however little remains, which a level-based
+// threshold cannot express — and it means the one state worth flagging fires on
+// unusual days rather than most of them.
+static uint16_t paceColor(float util, float elapsed) {
+    float d = util - elapsed;
+    if (d > 0.15f) return C_CRIT;
+    if (d > 0.02f) return C_WARN;
     return C_OK;
 }
 
-// ── Helpers ───────────────────────────────────────────────
+// Window lengths, needed to turn a reset time into an elapsed fraction. Both
+// are fixed, so the pace tick needs no data the API does not already give us:
+//   elapsed = 1 - (reset - now) / length
+static constexpr uint32_t WIN_5H = 5UL * 3600UL;
+static constexpr uint32_t WIN_7D = 7UL * 86400UL;
 
-// Renders the time left until a reset epoch as "3d 4h", "2h 14m" or "9m".
-// Returns false when there is nothing truthful to say — no epoch from the API,
-// or the clock has not been set — and the caller then draws a dash rather
-// than a plausible-looking wrong number.
-static bool fmtCountdown(uint32_t resetEpoch, char* out, size_t n) {
-    if (resetEpoch == 0) return false;
+static bool s_tzKnown = false;
+void uiSetTimezoneKnown(bool known) { s_tzKnown = known; }
+
+// Returns -1 when the fraction cannot be computed honestly.
+static float elapsedFraction(uint32_t resetEpoch, uint32_t windowSec) {
+    if (resetEpoch == 0) return -1.0f;
     time_t now = time(nullptr);
-    if (now < 1700000000) return false;      // NTP has not landed yet
-    long secs = (long)resetEpoch - (long)now;
-    if (secs <= 0) { snprintf(out, n, "due"); return true; }
+    if (now < 1700000000) return -1.0f;
+    long remain = (long)resetEpoch - (long)now;
+    if (remain < 0) remain = 0;
+    if ((uint32_t)remain > windowSec) return -1.0f;
+    float e = 1.0f - (float)remain / (float)windowSec;
+    return e < 0.0f ? 0.0f : (e > 1.0f ? 1.0f : e);
+}
 
-    long mins = secs / 60;
-    long hours = mins / 60;
-    long days = hours / 24;
-    if (days > 0)       snprintf(out, n, "%ldd %ldh", days, hours % 24);
-    else if (hours > 0) snprintf(out, n, "%ldh %02ldm", hours, mins % 60);
-    else                snprintf(out, n, "%ldm", mins);
+// The reset moment as a wall clock — "3:40pm" — which is the planning register:
+// what you compare against a calendar. Falls back to a duration when we have no
+// timezone, because a confidently wrong clock is worse than a vague duration.
+static bool fmtReset(uint32_t epoch, char* out, size_t n, bool withDay) {
+    if (epoch == 0) return false;
+    time_t now = time(nullptr);
+    if (now < 1700000000) return false;
+    long remain = (long)epoch - (long)now;
+    if (remain <= 0) { snprintf(out, n, "resetting"); return true; }
+
+    if (!s_tzKnown) {
+        long mins = remain / 60, hours = mins / 60, days = hours / 24;
+        if (days > 0)       snprintf(out, n, "in %ldd %ldh", days, hours % 24);
+        else if (hours > 0) snprintf(out, n, "in %ldh %02ldm", hours, mins % 60);
+        else                snprintf(out, n, "in %ldm", mins);
+        return true;
+    }
+
+    time_t t = (time_t)epoch;
+    struct tm tm_;
+    localtime_r(&t, &tm_);
+    int h12 = tm_.tm_hour % 12; if (h12 == 0) h12 = 12;
+    const char* ap = tm_.tm_hour < 12 ? "am" : "pm";
+    static const char* kDay[7] = {"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
+    if (withDay) snprintf(out, n, "%s %d%s", kDay[tm_.tm_wday], h12, ap);
+    else         snprintf(out, n, "%d:%02d%s", h12, tm_.tm_min, ap);
     return true;
 }
 
-static void drawHeader(int rssi, int batPct) {
-    g->fillRect(0, 0, SCREEN_W, 26, C_CARD);
-    g->setFont(&fonts::Font2);
-    g->setTextDatum(middle_left);
-    g->setTextColor(C_ACCENT, C_CARD);
-    g->drawString(s_headerLabel, 10, 13);
-
-    // Right side: signal bars then battery, laid out from the right edge in.
-    int x = SCREEN_W - 10;
-
-    if (batPct >= 0) {
-        char b[8];
-        snprintf(b, sizeof(b), "%d%%", batPct);
-        g->setTextDatum(middle_right);
-        g->setTextColor(batPct <= 15 ? C_CRIT : C_DIM, C_CARD);
-        g->drawString(b, x, 13);
-        x -= g->textWidth(b) + 10;
-    }
-
-    // Four bars. RSSI of 0 means "not connected" as far as this screen cares.
-    int bars = 0;
-    if (rssi != 0) {
-        if      (rssi > -60) bars = 4;
-        else if (rssi > -70) bars = 3;
-        else if (rssi > -80) bars = 2;
-        else                 bars = 1;
-    }
-    for (int i = 0; i < 4; i++) {
-        int h = 4 + i * 3;
-        g->fillRect(x - 22 + i * 6, 18 - h, 4, h, i < bars ? C_TEXT : C_DIM);
+// A diamond, with a one-pixel halo in the background colour so it holds its
+// shape against the dark track AND against any fill it overlaps. Points at its
+// own position, where a circle would claim an area.
+static void drawPaceTick(int cx, int cy, uint16_t halo, uint16_t ink) {
+    for (int r = 7; r >= 6; r--) {
+        uint16_t c = (r == 7) ? halo : ink;
+        for (int dy = -r; dy <= r; dy++) {
+            int dx = r - (dy < 0 ? -dy : dy);
+            g->drawFastHLine(cx - dx, cy + dy, dx * 2 + 1, c);
+        }
     }
 }
 
-// One usage block: label, big percentage, bar, countdown.
-static void drawUsageBlock(int y, const char* label, float pct,
-                           uint32_t resetEpoch, bool valid) {
+// One window as a full bar. The bar IS the window: its left edge is when the
+// window opened, its right edge is both exhaustion and reset. Remaining budget
+// is anchored right, so spending pushes its left edge rightward — and the pace
+// tick travels rightward too. Time flies like an arrow.
+static void drawWindowBar(int y, const char* label, float util,
+                          uint32_t resetEpoch, uint32_t windowSec, bool valid) {
+    const int bx = 16, bw = SCREEN_W - 32, bh = 24;
+    const float rem = 100.0f - util;
+
     g->setFont(&fonts::Font2);
     g->setTextDatum(top_left);
     g->setTextColor(C_DIM, C_BG);
-    g->drawString(label, 14, y);
+    g->drawString(label, bx, y);
 
+    // Headline and footnote trade contents at the crossover. Above it the big
+    // number is the budget; below it the clock, because the question has changed
+    // from "should I start this?" to "should I wait?".
+    char resetTxt[24];
+    bool haveReset = valid && fmtReset(resetEpoch, resetTxt, sizeof(resetTxt),
+                                       windowSec > WIN_5H);
+    const bool plenty = rem >= 40.0f;
+
+    char headline[24];
+    if (!valid)        strlcpy(headline, "--", sizeof(headline));
+    else if (plenty)   snprintf(headline, sizeof(headline), "%d%% left", (int)(rem + 0.5f));
+    else if (haveReset) strlcpy(headline, resetTxt, sizeof(headline));
+    else               strlcpy(headline, "--", sizeof(headline));
+
+    g->setFont(&fonts::FreeSansBold24pt7b);
     g->setTextDatum(top_right);
+    g->setTextColor(valid ? (plenty ? C_TEXT : C_ACCENT) : C_DIM, C_BG);
+    g->drawString(headline, bx + bw, y - 6);
+
+    // Track, then the remaining block anchored to the right edge.
+    const int by = y + 38;
+    g->fillRoundRect(bx, by, bw, bh, 5, C_CARD);
+
+    float e = valid ? elapsedFraction(resetEpoch, windowSec) : -1.0f;
     if (valid) {
-        char v[12];
-        // One decimal below 10% so a nearly-fresh window still visibly moves;
-        // whole numbers above that, where a tenth is noise.
-        if (pct < 10.0f) snprintf(v, sizeof(v), "%.1f%%", pct);
-        else             snprintf(v, sizeof(v), "%.0f%%", pct);
-        g->setFont(&fonts::FreeSansBold24pt7b);
-        g->setTextColor(C_TEXT, C_BG);
-        g->drawString(v, SCREEN_W - 14, y - 6);
-    } else {
-        g->setFont(&fonts::FreeSansBold24pt7b);
-        g->setTextColor(C_DIM, C_BG);
-        g->drawString("--", SCREEN_W - 14, y - 6);
+        float u = util < 0 ? 0 : (util > 100 ? 100 : util);
+        int edge = bx + (int)(bw * u / 100.0f + 0.5f);
+        int wRem = bx + bw - edge;
+        if (wRem > 0) {
+            uint16_t col = (e >= 0.0f) ? paceColor(u / 100.0f, e) : C_OK;
+            g->fillRoundRect(edge, by, wRem, bh, 5, col);
+        }
+        if (e >= 0.0f) drawPaceTick(bx + (int)(bw * e + 0.5f), by + bh / 2, C_BG, C_TEXT);
     }
 
-    // Bar
-    const int bx = 14, bw = SCREEN_W - 28, bh = 14;
-    const int by = y + 44;
-    g->fillRoundRect(bx, by, bw, bh, 4, C_CARD);
-    if (valid && pct > 0.0f) {
-        float p = pct > 100.0f ? 100.0f : pct;
-        int fw = (int)(bw * p / 100.0f + 0.5f);
-        if (fw < 5) fw = 5;              // a sliver still reads as "some"
-        g->fillRoundRect(bx, by, fw, bh, 4, barColor(pct));
-    }
-
-    // Countdown
-    char cd[24];
+    // Footnote: the clock while there is plenty, a proximity warning when there
+    // is not. "nearly out" claims closeness, not a fraction, so it cannot be
+    // wrong by a factor of two the way "about a third left" was.
     g->setFont(&fonts::Font2);
-    g->setTextDatum(top_left);
-    g->setTextColor(C_DIM, C_BG);
-    if (valid && fmtCountdown(resetEpoch, cd, sizeof(cd))) {
-        char line[40];
-        snprintf(line, sizeof(line), "resets in %s", cd);
-        g->drawString(line, 14, by + bh + 4);
-    } else {
-        g->drawString("reset unknown", 14, by + bh + 4);
+    g->setTextDatum(top_right);
+    if (valid && plenty && haveReset) {
+        char line[32];
+        snprintf(line, sizeof(line), "resets %s", resetTxt);
+        g->setTextColor(C_DIM, C_BG);
+        g->drawString(line, bx + bw, by + bh + 8);
+    } else if (valid && rem < 12.0f) {
+        g->setTextColor(C_WARN, C_BG);
+        g->drawString("nearly out", bx + bw, by + bh + 8);
     }
 }
 
-// The bottom strip. This is not decoration: it is the only thing telling the
-// user where the invisible touch buttons are, since CoreS3 has no real ones.
+// The 7-day window as one quiet line. It moves 1% per 100 minutes, so a bar for
+// it is seen hundreds of times per window looking identical every time — the
+// wallpaper an ambient display gets tuned out and then unplugged for.
+//
+// The pace phrase describes NOW, not Friday, so it is provisional without
+// needing an "at your current pace" hedge that would be too long to glance at.
+static void drawSevenDayLine(int y, const UsageData& d) {
+    const int bx = 16, bw = SCREEN_W - 32;
+    g->setFont(&fonts::Font2);
+    g->setTextDatum(top_left);
+    g->setTextColor(C_DIM, C_BG);
+    g->drawString("7-DAY", bx, y);
+
+    if (!d.ok) return;
+
+    float e = elapsedFraction(d.d7ResetEpoch, WIN_7D);
+    if (e >= 0.0f) {
+        float diff = (d.d7 / 100.0f) - e;
+        const char* phrase = diff > 0.02f ? "ahead of pace"
+                           : diff < -0.02f ? "behind pace" : "on pace";
+        g->setTextColor(diff > 0.15f ? C_CRIT : diff > 0.02f ? C_WARN : C_DIM, C_BG);
+        g->drawString(phrase, bx + 58, y);
+    }
+
+    char resetTxt[24];
+    if (fmtReset(d.d7ResetEpoch, resetTxt, sizeof(resetTxt), true)) {
+        char line[32];
+        snprintf(line, sizeof(line), "resets %s", resetTxt);
+        g->setTextDatum(top_right);
+        g->setTextColor(C_DIM, C_BG);
+        g->drawString(line, bx + bw, y);
+    }
+}
+
+// The bottom strip, used only by the screens that still drive BtnA/B/C — PIN
+// entry and boot. The dashboard has none: it reads raw taps, so it needs no
+// permanent legend and gets those 36 pixels back.
 static void drawButtonHints(const char* a, const char* b, const char* c) {
     const int y = SCREEN_H - TOUCH_BTN_H;
     g->fillRect(0, y, SCREEN_W, TOUCH_BTN_H, C_CARD);
@@ -365,39 +427,38 @@ static void drawSpinner(int x, int y) {
 void uiDashboard(const UsageData& data, unsigned long lastFetchMs, int rssi,
                  int batPct, bool fetching) {
     g->fillScreen(C_BG);
-    drawHeader(rssi, batPct);
 
-    drawUsageBlock(34,  "5-HOUR WINDOW", data.h5, data.h5ResetEpoch, data.ok);
-    drawUsageBlock(120, "7-DAY WINDOW",  data.d7, data.d7ResetEpoch, data.ok);
+    // No title stripe, no button row. Those cost 62 of 240 pixels — 26% of the
+    // screen — telling you the device's name and where to tap. Tap anywhere.
+    //
+    // The 7-day window is promoted to a full bar only when the server says it
+    // is the binding constraint. That was 23% of requests in a large capture,
+    // so most of the time the 5-hour window gets the display to itself.
+    const bool sevenBinds = data.ok && strncmp(data.claim, "seven_day", 9) == 0;
 
-    // Status line. When the headers went missing this is the only place that
-    // says so, and plan.md asks for that failure to be visible rather than
-    // silently showing stale bars.
+    if (sevenBinds) {
+        drawWindowBar(28,  "5-HOUR", data.h5, data.h5ResetEpoch, WIN_5H, data.ok);
+        drawWindowBar(130, "7-DAY",  data.d7, data.d7ResetEpoch, WIN_7D, data.ok);
+    } else {
+        drawWindowBar(62, "5-HOUR", data.h5, data.h5ResetEpoch, WIN_5H, data.ok);
+        drawSevenDayLine(186, data);
+    }
+
+    // Failure is graded by how much of the screen it makes untrue. This is the
+    // quiet rung: everything above is still correct, we just could not refresh.
     g->setFont(&fonts::Font2);
     g->setTextDatum(top_left);
     if (lastFetchMs == 0 && !data.ok) {
-        // Never fetched yet. "no data: " with an empty reason reads as a bug,
-        // and a confident zero would be worse — a reading we do not have is not
-        // a reading of nothing.
         g->setTextColor(C_DIM, C_BG);
-        g->drawString("waiting for first reading", 14, 206 - 22);
-    } else if (data.ok) {
-        unsigned long age = (millis() - lastFetchMs) / 1000UL;
-        char s[40];
-        if (age < 90) snprintf(s, sizeof(s), "updated %lus ago", age);
-        else          snprintf(s, sizeof(s), "updated %lum ago", age / 60);
-        g->setTextColor(C_DIM, C_BG);
-        g->drawString(s, 14, 206 - 22);
-    } else {
+        g->drawString("waiting for first reading", 16, 216);
+    } else if (!data.ok) {
         g->setTextColor(C_CRIT, C_BG);
-        char s[64];
-        snprintf(s, sizeof(s), "no data: %s", data.error);
-        g->drawString(s, 14, 206 - 22);
+        char sline[48];
+        snprintf(sline, sizeof(sline), "no data: %s", data.error);
+        g->drawString(sline, 16, 216);
     }
 
-    if (fetching) drawSpinner(SCREEN_W - 26, 206 - 22);
-
-    drawButtonHints("MENU", "MENU", "MENU");
+    if (fetching) drawSpinner(SCREEN_W - 26, 216);
     flush();
 }
 
@@ -411,16 +472,15 @@ const char* const kMenuRows[MENU_ROWS] = {
 
 // Geometry shared by the drawing and the hit test, so they cannot disagree.
 //
-// 34px rows were too small to hit reliably. This panel is about 160 px/inch, so
-// a 34px row is ~5.4mm — well under the ~7mm a fingertip wants. 46px is ~7.3mm.
-// Paying for it by dropping a row rather than by shrinking the margins: five
-// items at a comfortable size do not fit 240px, and four do.
-//
-// The version moved into the header, which is where "About" was going to live.
-static constexpr int MENU_TOP = 48;
+// 34px rows were too small to hit reliably on hardware. This panel is about
+// 160 px/inch, so 34px is ~5.4mm — well under the ~7mm a fingertip wants. 46px
+// is ~7.3mm. Five comfortable rows do not fit 240px and four do, so the menu
+// paid for the size with a row rather than with its margins; the version moved
+// into the header, which is where an "About" row was headed anyway.
+static constexpr int MENU_TOP   = 48;
 static constexpr int MENU_ROW_H = 46;
-static constexpr int MENU_X = 24;
-static constexpr int MENU_W = SCREEN_W - 48;
+static constexpr int MENU_X     = 20;
+static constexpr int MENU_W     = SCREEN_W - 40;
 
 int uiMenuRowAt(int x, int y) {
     if (x < MENU_X || x > MENU_X + MENU_W) return -1;
@@ -442,11 +502,11 @@ void uiMenu(int highlight) {
     for (int i = 0; i < MENU_ROWS; i++) {
         int y = MENU_TOP + i * MENU_ROW_H;
         bool on = (i == highlight);
-        g->fillRoundRect(MENU_X, y + 2, MENU_W, MENU_ROW_H - 4, 5,
+        g->fillRoundRect(MENU_X, y + 3, MENU_W, MENU_ROW_H - 6, 6,
                          on ? C_ACCENT : C_CARD);
         g->setTextDatum(middle_left);
         g->setTextColor(on ? C_BG : C_TEXT, on ? C_ACCENT : C_CARD);
-        g->drawString(kMenuRows[i], MENU_X + 14, y + MENU_ROW_H / 2);
+        g->drawString(kMenuRows[i], MENU_X + 16, y + MENU_ROW_H / 2);
     }
     flush();
 }

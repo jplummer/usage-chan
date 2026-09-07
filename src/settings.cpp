@@ -3,7 +3,8 @@
  * SPDX-FileCopyrightText: 2026 oauramos
  *
  * Vendored from claude-usage-stick (github.com/oauramos/claude-usage-stick).
- * Unmodified.
+ * Modified: an out-of-range poll_sec now falls back to DEFAULT_POLL_SEC rather
+ * than clamping to the nearest bound. See the comment at the change.
  *
  * See docs/attribution.md.
  */
@@ -28,10 +29,20 @@ void settingsLoad(Settings& s) {
     prefs.getString("ssid", s.ssid, sizeof(s.ssid));
     prefs.getString("wifipass", s.wifipass, sizeof(s.wifipass));
     s.hasBlob    = prefs.getBytes("blob", &s.blob, sizeof(s.blob)) == sizeof(s.blob);
-    s.pollSec    = constrain(prefs.getInt("poll_sec", DEFAULT_POLL_SEC), MIN_POLL_SEC, MAX_POLL_SEC);
+    // Out of range means STALE, not "near the bound". A device provisioned when
+    // the floor was 30s holds a 60 that clamping would turn into today's floor
+    // of 120 — a value nobody chose, quietly two and a half times more eager
+    // than the current default. A value written against a schema that no longer
+    // exists is not information; fall back to the default rather than pretend
+    // the nearest legal number was the intent.
+    int32_t storedPoll = prefs.getInt("poll_sec", DEFAULT_POLL_SEC);
+    s.pollSec = (storedPoll < MIN_POLL_SEC || storedPoll > MAX_POLL_SEC)
+                    ? DEFAULT_POLL_SEC
+                    : storedPoll;
     s.brightness = constrain(prefs.getInt("brightness", DEFAULT_BRIGHTNESS), 0, 3);
     prefs.getString("dev_name", s.devName, sizeof(s.devName));
     s.tzMin      = constrain(prefs.getInt("tz_min", 0), -840, 840);
+    s.tzSet      = prefs.getUChar("tz_set", 0) ? 1 : 0;
     s.flip       = prefs.getUChar("flip", 0) ? 1 : 0;
     s.uiMode     = constrain(prefs.getUChar("ui_mode", 0), 0, 2);
     s.dwellS     = prefs.getUChar("dwell_s", 10);

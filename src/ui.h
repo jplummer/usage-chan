@@ -43,5 +43,12 @@ void uiMenu(int highlight);
 int  uiMenuRowAt(int x, int y);
 
 // Header label, from the device name set in the captive portal. Empty falls
-// back to "USAGE-CHAN".
+// back to "USAGE-CHAN". Unused by the dashboard now that the title stripe is
+// gone; kept for the menu and for provisioning screens.
 void uiSetHeaderLabel(const char* name);
+
+// Whether a real timezone has been chosen. Until one has, reset times render as
+// durations rather than a wall clock, because tzMin defaults to 0 — a
+// legitimate offset (UTC) that would otherwise silently render every clock
+// seven or eight hours wrong.
+void uiSetTimezoneKnown(bool known);

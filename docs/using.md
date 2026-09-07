@@ -9,20 +9,40 @@ touch it. This covers the times you do.
 
 ## What is on screen
 
-Two bars.
+Usually one bar and one line.
 
-**5-hour window** — the rolling short limit, the one that usually stops you.
-**7-day window** — the rolling long limit.
+**The bar is the window, not the budget.** Its left edge is when the window
+opened; its right edge is both exhaustion and reset. Remaining budget is a block
+anchored to the right, so spending pushes its left edge rightward.
 
-Each shows a percentage used, a bar, and a countdown to when that window
-resets. Bars are green below 60%, amber from 60%, red from 85%.
+**The diamond is your pace** — where an even burn would have you right now. Both
+markers travel rightward, because time flies like an arrow.
 
-Below them, a status line: how long ago the numbers arrived, or why they did
-not.
+- Diamond **left** of the block's edge: you are spending slower than even. Calm,
+  however little remains.
+- Diamond **right** of it: burning faster than the window carries.
 
-> These are *utilization* figures straight from Anthropic, not a calculation we
-> do. If they disagree with `claude /usage`, believe `claude /usage` and please
-> open an issue.
+That relationship is what colours the bar. There is no "you are at 60%" warning,
+because being at 60% with time to spare is fine and being at 60% early is not.
+
+**The big number changes what it means as the window closes.** With plenty left
+it is the budget (`62% left`) and the reset is a footnote. Below about 40% they
+swap: the clock becomes the headline, because the question has changed from
+*should I start this?* to *should I wait?*
+
+**The 7-day window is one line**, not a bar — it moves 1% per 100 minutes, so a
+bar for it would be furniture. It says `behind pace`, `on pace` or `ahead of
+pace`, which describes now rather than predicting Friday. It grows into a full
+bar only when the server says it is the binding limit.
+
+> The utilization figures come straight from Anthropic; so does the answer to
+> which window is binding. If they disagree with `claude /usage`, believe
+> `claude /usage` and please open an issue.
+
+**Reset times show as durations until a timezone is set.** `tzMin` defaults to
+0, which is a legitimate offset rather than a marker for "unknown", so a wall
+clock would silently render seven or eight hours wrong. Nothing can choose a
+timezone yet — that arrives with the menu, and the clocks light up then.
 
 ## The controls
 

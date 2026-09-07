@@ -25,6 +25,10 @@ struct Settings {
     uint8_t       brightness;   // stored as i32, 0..3
     char          devName[33];
     int32_t       tzMin;        // i32, minutes east of UTC, -840..840
+    uint8_t       tzSet;        // u8, whether tzMin was ever chosen. 0 is a
+                                // legitimate offset (UTC), so it cannot double
+                                // as "unknown" — and rendering a wall clock in
+                                // the wrong zone is worse than not rendering one
     uint8_t       flip;         // u8, persisted 180° screen rotation
     uint8_t       uiMode;       // u8, 0=static (dash) 1=carousel 2=clock
     uint8_t       dwellS;       // u8, carousel dwell: 5/10/15/30 s

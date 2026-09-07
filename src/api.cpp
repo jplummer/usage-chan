@@ -3,7 +3,8 @@
  * SPDX-FileCopyrightText: 2026 oauramos
  *
  * Vendored from claude-usage-stick (github.com/oauramos/claude-usage-stick).
- * Unmodified.
+ * Modified: collects anthropic-ratelimit-unified-representative-claim, the
+ * server's own answer to which window is binding.
  *
  * See docs/attribution.md.
  */
@@ -14,13 +15,16 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 
+// HTTPClient discards any header not named here, and collectHeaders() must be
+// called before POST — which is why this allowlist exists at all.
 static const char* RL_HEADERS[] = {
     "anthropic-ratelimit-unified-5h-utilization",
     "anthropic-ratelimit-unified-5h-reset",
     "anthropic-ratelimit-unified-7d-utilization",
     "anthropic-ratelimit-unified-7d-reset",
+    "anthropic-ratelimit-unified-representative-claim",
 };
-static const int RL_HEADER_COUNT = 4;
+static const int RL_HEADER_COUNT = 5;
 
 bool fetchUsage(const char* token, UsageData& out) {
     WiFiClientSecure client;
@@ -60,9 +64,11 @@ bool fetchUsage(const char* token, UsageData& out) {
     String h5r = https.header("anthropic-ratelimit-unified-5h-reset");
     String d7u = https.header("anthropic-ratelimit-unified-7d-utilization");
     String d7r = https.header("anthropic-ratelimit-unified-7d-reset");
+    String claim = https.header("anthropic-ratelimit-unified-representative-claim");
 
     Serial.printf("[API] 5h: %s  7d: %s\n", h5u.c_str(), d7u.c_str());
     Serial.printf("[API] 5h_reset: %s  7d_reset: %s\n", h5r.c_str(), d7r.c_str());
+    Serial.printf("[API] binding: %s\n", claim.length() ? claim.c_str() : "(absent)");
 
     https.end();
 
@@ -81,6 +87,7 @@ bool fetchUsage(const char* token, UsageData& out) {
     out.d7 = d7u.toFloat() * 100.0f;
     out.h5ResetEpoch = (uint32_t)h5r.toInt();
     out.d7ResetEpoch = (uint32_t)d7r.toInt();
+    strlcpy(out.claim, claim.c_str(), sizeof(out.claim));
     out.ok = true;
     return true;
 }

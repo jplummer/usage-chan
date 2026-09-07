@@ -82,11 +82,10 @@ void halSetBrightness(uint8_t level) {
 // device that stores 0 boots dark, every time, with no visible way back. That
 // is indistinguishable from broken hardware.
 //
-// Off stays reachable (a lit panel on a nightstand at 2am is a real problem),
-// but it is now a runtime state that a power cycle clears rather than something
-// that can be saved into a corner. Two rules keep it recoverable:
+// There is no "off" in this product. It is a desk device for working hours, and
+// a screen you cannot see is a screen that is not doing its job. Level 0 stays
+// in the table only so an old stored value maps to something.
 uint8_t halNextBrightness(uint8_t level) {
-    // Cycling never lands on 0. Off needs a deliberate act, not a fourth tap.
     return (level >= 3 || level == 0) ? 1 : (uint8_t)(level + 1);
 }
 

@@ -175,6 +175,7 @@ void setup() {
     g_settings.brightness = halBootBrightness(g_settings.brightness);
     halSetBrightness(g_settings.brightness);
     uiSetHeaderLabel(g_settings.devName);
+    uiSetTimezoneKnown(g_settings.tzSet != 0);
 
     unlockPhase(60);
 
