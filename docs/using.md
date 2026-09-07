@@ -26,18 +26,35 @@ not.
 
 ## The controls
 
-There are no physical buttons — the reset button underneath reboots the chip
-without firmware seeing it, and the side power button is not wired to anything
-yet. The bottom 36 pixels of the touchscreen are three zones, labelled on every
-screen that uses them.
+The board's physical buttons are reset (which reboots the chip without firmware
+seeing it) and soft power (not wired to anything yet), so everything happens on
+the panel. Two input styles coexist:
+
+**The dashboard reads taps anywhere.** Tap the screen to open the menu; tap
+outside the menu rows to close it.
+
+| Menu row | Does |
+|---|---|
+| Brightness | Cycles off → dim → normal → bright |
+| Refresh interval | Nothing yet |
+| Network | Nothing yet |
+| Control panel | Nothing yet |
+| About | Nothing yet |
+
+**PIN entry and boot still use the three zones** along the bottom 36 pixels,
+labelled on the screens that use them.
 
 | Screen | Left third | Middle third |
 |---|---|---|
-| Dashboard | Cycle brightness: off → dim → normal → bright | Refresh now |
 | PIN entry | Advance digit | Confirm digit |
 | During boot | Hold both for 2s → factory reset | |
 
 Brightness survives a reboot. "Off" really is off, and the device keeps running.
+
+> **Changed.** Refresh-now used to be a button. It is not currently reachable —
+> the poll runs on its own five-minute schedule and the menu row is inert. Given
+> that Anthropic's usage surfaces rate-limit hard and manual refreshes make that
+> worse, this is not urgent to restore.
 
 ## Configuration
 
@@ -95,12 +112,17 @@ confident stale number.
 | `no data: auth_failed` | Token rejected — usually expired | Re-run `claude setup-token`, factory reset, set up again |
 | `no data: no_usage_h_200` | Authenticated, but this plan publishes no usage headers | Expected on Enterprise and API-billed accounts. Nothing to fix |
 | `no data: http_-1` and similar | Network or TLS failure | Usually transient. Check WiFi |
-| `reset unknown` under a bar | No reset time, or the clock has not synced | Should resolve within a minute of boot |
+| `waiting for first reading` | Booted, nothing fetched yet | Normal for the first few seconds |
+| `reset unknown` under a bar | No reset time, or the clock has not synced | Should resolve within a minute of boot. NTP now retries with backoff and keeps trying in the background |
 | `--` instead of a percentage | No data at all this session | See the status line |
 
-**Known gap:** a failed fetch currently replaces the last good numbers rather
-than keeping them with a staleness note. Good clients keep the last reading and
-mark it stale. Worth fixing.
+A small spinner appears beside the status line while a fetch is in flight. It
+can turn at all because the fetch runs on the second core — the screen stays
+live throughout, including touch.
+
+**Known gap:** a failed fetch still replaces the last good numbers rather than
+keeping them with a staleness note. Good clients keep the last reading and mark
+it stale. Worth fixing.
 
 ## Things it deliberately does not show
 

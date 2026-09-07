@@ -148,6 +148,8 @@
             <button data-s="offline" aria-pressed="false">offline</button>
           </div>
         </div>
+        <label class="check"><input type="checkbox" id="promote">
+          7-day is the binding limit</label>
         <div class="verdict" id="verdict"></div>
       </div>
     </div>
@@ -189,6 +191,12 @@
       <dd>Tick left of the edge means behind pace: calm, however little remains.
       Tick right means burning faster than the window carries — the one state
       worth a colour change.</dd>
+
+      <dt>the 7-day window is a line, not a bar</dt>
+      <dd>It moves 1% per 100 minutes, so a bar for it is seen hundreds of times
+      per window and looks identical nearly every time — wallpaper. It promotes
+      to a full bar only when <code>representative-claim</code> says it is the
+      binding limit, which was 23% of requests in a 37,000-request capture.</dd>
 
       <dt>a message is as big as what it invalidates</dt>
       <dd>Weak signal costs you nothing but latency, so it is a small glyph.
@@ -245,9 +253,17 @@
     if(rem < 35) return 'about a third left';
     return Math.round(rem)+'% left';
   }
-  function resetFor(rem, txtFar, txtNear){ return rem < 35 ? txtNear : txtFar; }
+  // Planning register while there is planning to do; urgency register only when
+  // the answer is imminent. The 7-day window's "imminent" is still hours away,
+  // so it stays a wall clock — "in 4h" is vaguer than "1:07pm", and arguably
+  // less precise than the "Fri 1pm" it would replace.
+  function resetFor(rem, far, near, imminent){
+    if(rem < 8)  return imminent;
+    if(rem < 35) return near;
+    return far;
+  }
 
-  function block(y,label,u,e,txtFar,txtNear,treat){
+  function block(y,label,u,e,txtFar,txtNear,txtNow,treat){
     const edge=BX+BW*u, tx=BX+BW*e, col=barColor(u,e);
     const rem=(1-u)*100;
     return `
@@ -262,7 +278,7 @@
       ${tick(tx, y+26, BH, treat)}
 
       <text x="${BX+BW}" y="${y+62}" fill="${D.dim}" font-family="monospace"
-            font-size="11" text-anchor="end">${resetFor(rem,txtFar,txtNear)}</text>`;
+            font-size="11" text-anchor="end">${resetFor(rem,txtFar,txtNear,txtNow)}</text>`;
   }
 
   // The standard WiFi glyph: a dot with concentric arcs radiating upward.
@@ -306,10 +322,32 @@
             text-anchor="middle">no network</text>`;
   }
 
-  function screen(u,e,treat,state){
-    let out = `<rect width="320" height="240" fill="${D.bg}"/>`
-      + block(30, '5-HOUR',  u,      e,      'resets in 2h 24m', 'resets in 1h 38m', treat)
-      + block(128,'7-DAY',   u*0.55, e*0.62, 'resets in 4d 6h',  'resets in 2d 1h',  treat);
+  // The 7-day window is one quiet line by default: no bar, no percentage, and
+  // no gauge to habituate to. Words state facts; the pace phrase describes NOW,
+  // not Friday, so it needs no "at your current pace" hedge.
+  function sevenDayLine(y,u7,e7){
+    const d=u7-e7;
+    const phrase = d > 0.02 ? 'ahead of pace' : d < -0.02 ? 'behind pace' : 'on pace';
+    const col    = d > 0.15 ? D.crit : d > 0.02 ? D.warn : D.dim;
+    return `<text x="${BX}" y="${y}" fill="${D.dim}" font-family="monospace"
+                  font-size="10" letter-spacing="1.1">7-DAY</text>
+            <text x="${BX+52}" y="${y}" fill="${col}" font-family="monospace"
+                  font-size="11">${phrase}</text>
+            <text x="${BX+BW}" y="${y}" fill="${D.dim}" font-family="monospace"
+                  font-size="11" text-anchor="end">resets Friday</text>`;
+  }
+
+  function screen(u,e,treat,state,promote){
+    const u7=u*0.55, e7=e*0.62;
+    let out = `<rect width="320" height="240" fill="${D.bg}"/>`;
+    if(promote){
+      // 7-day is the binding constraint. Same geometry, equal billing.
+      out += block(24, '5-HOUR', u,  e,  'resets 3:40pm', 'resets 3:40pm', 'resets in 12m', treat)
+           + block(126,'7-DAY',  u7, e7, 'resets Friday', 'resets Fri 1pm','resets 1:07pm', treat);
+    } else {
+      out += block(56, '5-HOUR', u, e, 'resets 3:40pm', 'resets 3:40pm', 'resets in 12m', treat)
+           + sevenDayLine(176, u7, e7);
+    }
     if(state==='weak')    out += wifi(300,224,1.0,D.warn,false);
     if(state==='service') out += serviceBadge();
     if(state==='offline') out += smoke();
@@ -320,13 +358,14 @@
   const util=document.getElementById('util'), elapsed=document.getElementById('elapsed');
   const utilv=document.getElementById('utilv'), elapsedv=document.getElementById('elapsedv');
   const verdict=document.getElementById('verdict');
+  const promote=document.getElementById('promote');
   let treat='diamond', state='ok';
 
   function render(){
     const u=util.value/100, e=elapsed.value/100;
     utilv.textContent=util.value+'%';
     elapsedv.textContent=elapsed.value+'%';
-    dev.innerHTML=screen(u,e,treat,state);
+    dev.innerHTML=screen(u,e,treat,state,promote.checked);
 
     const gap=Math.round((u-e)*BW);
     let msg;
@@ -339,6 +378,7 @@
 
   util.addEventListener('input',render);
   elapsed.addEventListener('input',render);
+  promote.addEventListener('change',render);
   document.getElementById('stateseg').addEventListener('click',ev=>{
     const b=ev.target.closest('button'); if(!b) return;
     state=b.dataset.s;

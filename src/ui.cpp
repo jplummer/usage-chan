@@ -349,7 +349,21 @@ void uiLockoutTick(int secondsLeft) {
     flush();
 }
 
-void uiDashboard(const UsageData& data, unsigned long lastFetchMs, int rssi, int batPct) {
+// A four-phase mark that advances on every redraw during a fetch. It can only
+// animate because the fetch now runs on core 0 — on a blocked loop this would
+// simply freeze, which is what made the whole idea need the threading first.
+static void drawSpinner(int x, int y) {
+    static uint8_t phase = 0;
+    static const char* frames[4] = {"|", "/", "-", "\\"};
+    g->setFont(&fonts::Font2);
+    g->setTextDatum(top_left);
+    g->setTextColor(C_ACCENT, C_BG);
+    g->drawString(frames[phase & 3], x, y);
+    phase++;
+}
+
+void uiDashboard(const UsageData& data, unsigned long lastFetchMs, int rssi,
+                 int batPct, bool fetching) {
     g->fillScreen(C_BG);
     drawHeader(rssi, batPct);
 
@@ -361,7 +375,13 @@ void uiDashboard(const UsageData& data, unsigned long lastFetchMs, int rssi, int
     // silently showing stale bars.
     g->setFont(&fonts::Font2);
     g->setTextDatum(top_left);
-    if (data.ok) {
+    if (lastFetchMs == 0 && !data.ok) {
+        // Never fetched yet. "no data: " with an empty reason reads as a bug,
+        // and a confident zero would be worse — a reading we do not have is not
+        // a reading of nothing.
+        g->setTextColor(C_DIM, C_BG);
+        g->drawString("waiting for first reading", 14, 206 - 22);
+    } else if (data.ok) {
         unsigned long age = (millis() - lastFetchMs) / 1000UL;
         char s[40];
         if (age < 90) snprintf(s, sizeof(s), "updated %lus ago", age);
@@ -375,7 +395,53 @@ void uiDashboard(const UsageData& data, unsigned long lastFetchMs, int rssi, int
         g->drawString(s, 14, 206 - 22);
     }
 
-    drawButtonHints("DIM", "REFRESH", "");
+    if (fetching) drawSpinner(SCREEN_W - 26, 206 - 22);
+
+    drawButtonHints("MENU", "MENU", "MENU");
+    flush();
+}
+
+// ── Menu ──────────────────────────────────────────────────
+const char* const kMenuRows[MENU_ROWS] = {
+    "Brightness",
+    "Refresh interval",
+    "Network",
+    "Control panel",
+    "About",
+};
+
+// Geometry shared by the drawing and the hit test, so they cannot disagree.
+static constexpr int MENU_TOP = 44;
+static constexpr int MENU_ROW_H = 34;
+static constexpr int MENU_X = 24;
+static constexpr int MENU_W = SCREEN_W - 48;
+
+int uiMenuRowAt(int x, int y) {
+    if (x < MENU_X || x > MENU_X + MENU_W) return -1;
+    if (y < MENU_TOP) return -1;
+    int row = (y - MENU_TOP) / MENU_ROW_H;
+    return (row >= 0 && row < MENU_ROWS) ? row : -1;
+}
+
+void uiMenu(int highlight) {
+    g->fillScreen(C_BG);
+
+    g->setFont(&fonts::Font2);
+    g->setTextDatum(top_left);
+    g->setTextColor(C_DIM, C_BG);
+    g->drawString("MENU", MENU_X, 18);
+    g->setTextDatum(top_right);
+    g->drawString("tap outside to close", MENU_X + MENU_W, 18);
+
+    for (int i = 0; i < MENU_ROWS; i++) {
+        int y = MENU_TOP + i * MENU_ROW_H;
+        bool on = (i == highlight);
+        g->fillRoundRect(MENU_X, y + 2, MENU_W, MENU_ROW_H - 4, 5,
+                         on ? C_ACCENT : C_CARD);
+        g->setTextDatum(middle_left);
+        g->setTextColor(on ? C_BG : C_TEXT, on ? C_ACCENT : C_CARD);
+        g->drawString(kMenuRows[i], MENU_X + 14, y + MENU_ROW_H / 2);
+    }
     flush();
 }
 

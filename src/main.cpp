@@ -7,12 +7,19 @@
  * Structure follows claude-usage-stick's main.cpp (MIT, oauramos), reduced to
  * the single-screen path: no carousel, no web panel, no history, no news.
  *
- * Controls — the three "buttons" are the left, middle and right thirds of the
- * bottom 36 pixels of the touchscreen. There are no physical buttons on this
- * board; the bottom strip of every screen labels them.
- *   PIN entry   left = next digit value, middle = confirm digit
- *   Dashboard   left = brightness, middle = refresh now
- *   Boot        hold left + middle for 2s = factory reset (wipes NVS)
+ * Controls. The board's physical buttons are reset (invisible to firmware) and
+ * soft power (M5.BtnPWR, unused so far), so everything happens on the panel.
+ * Two input styles coexist deliberately:
+ *
+ *   PIN entry and boot use BtnA/B/C — M5Unified's three synthesised zones along
+ *   the bottom 36px, which every such screen labels.
+ *     PIN entry   left = next digit value, middle = confirm digit
+ *     Boot        hold left + middle for 2s = factory reset (wipes NVS)
+ *
+ *   Dashboard and menu read RAW touch coordinates, so a tap anywhere opens the
+ *   menu and there is no permanent button strip eating 36 pixels.
+ *     Dashboard   tap anywhere = open menu
+ *     Menu        tap a row = act · tap outside the rows = close
  */
 
 #include "hal.h"
@@ -23,7 +30,12 @@
 #include "app_state.h"
 #include "provision.h"
 #include "api.h"
+#include "fetcher.h"
+#include "clock.h"
 #include <WiFi.h>
+
+enum Screen : uint8_t { SCREEN_DASH, SCREEN_MENU };
+static Screen s_screen = SCREEN_DASH;
 
 Settings      g_settings;
 UsageData     g_usage;
@@ -74,21 +86,15 @@ static void makeApCreds(char* apName, size_t nameLen, char* apPass, size_t passL
     apPass[n] = '\0';
 }
 
-// The reset countdowns are the only thing that needs a real clock, and they
-// need it before the first fetch is drawn.
-static void syncTime() {
-    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
-    struct tm t;
-    getLocalTime(&t, 5000);
-}
-
-static void refresh() {
-    if (WiFi.status() != WL_CONNECTED) {
-        connectWiFi(g_settings.ssid, g_settings.wifipass);
-    }
-    fetchUsage(g_token, g_usage);
-    g_lastFetchMs = millis();
-    uiDashboard(g_usage, g_lastFetchMs, WiFi.RSSI(), halBatPercent());
+// Asks the worker on core 0 for a fetch and returns immediately. Nothing here
+// waits: the render loop keeps drawing, keeps reading touch, and keeps counting
+// down while the request is in flight.
+//
+// Reconnecting WiFi used to happen here, inline, before every fetch. It now
+// belongs to the worker's own WL_CONNECTED check — doing it on the render loop
+// would reintroduce exactly the blocking this change removes.
+static void requestRefresh() {
+    fetcherRequest();
 }
 
 // ── PIN + decrypt. Ten failures wipe the credentials. ─────
@@ -182,36 +188,73 @@ void setup() {
     }
 
     uiBootProgress(90, "Syncing time...");
-    syncTime();
+    clockBegin();
     settingsApplyTZ(g_settings.tzMin);
+    // Wait briefly for a first answer, but do not hang on it. clockTick() keeps
+    // trying from loop(), so a slow NTP server delays the countdowns rather
+    // than wedging the boot.
+    for (int i = 0; i < 30 && !clockValid(); i++) { delay(100); clockTick(); }
 
     uiBootProgress(95, "Fetching usage...");
-    refresh();
+    fetcherBegin();
+    requestRefresh();
 }
 
 void loop() {
     halUpdate();
+    clockTick();
 
-    if (halBtnAWasPressed()) {
-        g_settings.brightness = (g_settings.brightness + 1) % 4;
-        halSetBrightness(g_settings.brightness);
-        settingsPutInt("brightness", g_settings.brightness);
-    }
+    // Read the published result. Never blocks for long; a missed frame just
+    // redraws the values already on screen, which are still correct.
+    fetcherSnapshot(g_usage, g_lastFetchMs);
 
-    if (halBtnBWasPressed()) {
-        refresh();
+    // ── Touch ──────────────────────────────────────────
+    // Raw coordinates, not BtnA/B/C. The synthesised buttons still exist for
+    // the PIN screen, but the dashboard and menu read taps directly so a tap
+    // anywhere can open the menu.
+    static int s_hot = -1;
+    if (M5.Touch.getCount()) {
+        auto t = M5.Touch.getDetail(0);
+        if (s_screen == SCREEN_MENU) {
+            if (t.isPressed()) {
+                int row = uiMenuRowAt(t.x, t.y);
+                if (row != s_hot) { s_hot = row; uiMenu(s_hot); }
+            } else if (t.wasClicked()) {
+                int row = uiMenuRowAt(t.x, t.y);
+                s_hot = -1;
+                if (row < 0) {
+                    s_screen = SCREEN_DASH;              // tap outside closes
+                } else if (row == 0) {
+                    // Brightness is wired because it worked before the menu
+                    // existed; orphaning it would be a regression. The rest are
+                    // deliberately inert until the settings work lands.
+                    g_settings.brightness = (g_settings.brightness + 1) % 4;
+                    halSetBrightness(g_settings.brightness);
+                    settingsPutInt("brightness", g_settings.brightness);
+                    uiMenu(-1);
+                } else {
+                    Serial.printf("[MENU] %s (not wired up yet)\n", kMenuRows[row]);
+                    uiMenu(-1);
+                }
+            }
+        } else if (t.wasClicked()) {
+            s_screen = SCREEN_MENU;
+            s_hot = -1;
+            uiMenu(-1);
+        }
     }
 
     if (millis() - g_lastFetchMs >= (unsigned long)g_settings.pollSec * 1000UL) {
-        refresh();
+        requestRefresh();
     }
 
-    // Redraw once a second so the countdowns and the "updated Ns ago" line
-    // stay honest between fetches. The whole frame is composed off-screen and
-    // pushed at once, so there is nothing to flicker.
+    // Redraw the dashboard about three times a second while a fetch is running
+    // so the spinner turns, and once a second otherwise for the countdowns.
     static unsigned long lastRedraw = 0;
-    if (millis() - lastRedraw > 1000) {
-        uiDashboard(g_usage, g_lastFetchMs, WiFi.RSSI(), halBatPercent());
+    unsigned long interval = fetcherBusy() ? 300 : 1000;
+    if (s_screen == SCREEN_DASH && millis() - lastRedraw > interval) {
+        uiDashboard(g_usage, g_lastFetchMs, WiFi.RSSI(), halBatPercent(),
+                    fetcherBusy());
         lastRedraw = millis();
     }
 

@@ -83,6 +83,9 @@ are three buttons, labelled on screen:
 
 Four digits, then it connects, syncs the clock, and fetches.
 
+If NTP is slow the boot continues anyway and keeps retrying in the background,
+so a stubborn network delays the countdowns rather than wedging the device.
+
 > **Known rough edge.** Worst case this is 36 taps. The LAN panel will let you
 > type the PIN in a browser instead, which also unlocks the device.
 

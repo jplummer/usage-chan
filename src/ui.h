@@ -24,9 +24,23 @@ void uiLockoutStatic(int attempts, int maxAttempts, int lockoutSec);
 void uiLockoutTick(int secondsLeft);
 
 // The main screen.
-void uiDashboard(const UsageData& data, unsigned long lastFetchMs, int rssi, int batPct);
+void uiDashboard(const UsageData& data, unsigned long lastFetchMs, int rssi,
+                 int batPct, bool fetching);
 
 void uiError(const char* title, const char* detail = nullptr);
+
+// ── Menu ─────────────────────────────────────────────────
+// Dummy contents for now: this exists to prove tap-to-open/close and to give
+// the settings work somewhere to land. Rows do nothing yet.
+#define MENU_ROWS 5
+extern const char* const kMenuRows[MENU_ROWS];
+
+// Draws the menu. `highlight` is the row under the finger, or -1 for none.
+void uiMenu(int highlight);
+
+// Returns the row index at a touch point, or -1 if the touch was outside the
+// rows (which the caller treats as "close").
+int  uiMenuRowAt(int x, int y);
 
 // Header label, from the device name set in the captive portal. Empty falls
 // back to "USAGE-CHAN".
