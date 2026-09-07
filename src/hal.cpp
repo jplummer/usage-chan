@@ -77,3 +77,20 @@ void halSetBrightness(uint8_t level) {
     static const uint8_t table[4] = {0, 48, 128, 255};
     lcd.setBrightness(table[level > 3 ? 3 : level]);
 }
+
+// Level 0 is a genuinely off backlight, and brightness is persisted — so a
+// device that stores 0 boots dark, every time, with no visible way back. That
+// is indistinguishable from broken hardware.
+//
+// Off stays reachable (a lit panel on a nightstand at 2am is a real problem),
+// but it is now a runtime state that a power cycle clears rather than something
+// that can be saved into a corner. Two rules keep it recoverable:
+uint8_t halNextBrightness(uint8_t level) {
+    // Cycling never lands on 0. Off needs a deliberate act, not a fourth tap.
+    return (level >= 3 || level == 0) ? 1 : (uint8_t)(level + 1);
+}
+
+uint8_t halBootBrightness(uint8_t stored) {
+    // Whatever is in NVS, come up visible.
+    return stored == 0 ? 2 : stored;
+}

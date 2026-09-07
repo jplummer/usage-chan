@@ -32,7 +32,7 @@ void uiError(const char* title, const char* detail = nullptr);
 // ── Menu ─────────────────────────────────────────────────
 // Dummy contents for now: this exists to prove tap-to-open/close and to give
 // the settings work somewhere to land. Rows do nothing yet.
-#define MENU_ROWS 5
+#define MENU_ROWS 4
 extern const char* const kMenuRows[MENU_ROWS];
 
 // Draws the menu. `highlight` is the row under the finger, or -1 for none.

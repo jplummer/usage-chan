@@ -27,3 +27,9 @@ bool halBtnBIsPressed();
 
 int  halBatPercent();
 void halSetBrightness(uint8_t level);   // 0..3, mapped to panel 0/48/128/255
+
+// Brightness has a trap in it: level 0 is a dark backlight and the value is
+// persisted, so a stored 0 boots dark forever with no visible way back. These
+// two keep "off" reachable without letting it become permanent.
+uint8_t halNextBrightness(uint8_t level);   // cycles 1->2->3->1, never 0
+uint8_t halBootBrightness(uint8_t stored);  // a stored 0 comes up visible

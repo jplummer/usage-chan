@@ -35,11 +35,15 @@ outside the menu rows to close it.
 
 | Menu row | Does |
 |---|---|
-| Brightness | Cycles off → dim → normal → bright |
+| Brightness | Cycles dim → normal → bright |
 | Refresh interval | Nothing yet |
 | Network | Nothing yet |
 | Control panel | Nothing yet |
-| About | Nothing yet |
+
+Four rows rather than five, because 34-pixel rows were too small to hit
+reliably — this panel is around 160 px/inch, so that is about 5.4mm against the
+7mm a fingertip wants. The version moved into the menu header, which is where an
+"About" row was headed anyway.
 
 **PIN entry and boot still use the three zones** along the bottom 36 pixels,
 labelled on the screens that use them.
@@ -49,7 +53,17 @@ labelled on the screens that use them.
 | PIN entry | Advance digit | Confirm digit |
 | During boot | Hold both for 2s → factory reset | |
 
-Brightness survives a reboot. "Off" really is off, and the device keeps running.
+Brightness survives a reboot — **except off**, deliberately.
+
+Cycling goes dim → normal → bright and never lands on off. Level 0 really does
+cut the backlight, and because brightness is persisted, a device that stored 0
+would boot dark forever with no visible way back: indistinguishable from broken
+hardware. Off stays reachable for a nightstand at 2am, but it is a runtime state
+a power cycle clears, not something that can be saved into a corner.
+
+> **If your screen is dark and the device seems alive**, it is probably this,
+> from firmware before the fix. Touch still works: tap the middle of the screen
+> to open the menu, then tap about a quarter of the way down to hit Brightness.
 
 > **Changed.** Refresh-now used to be a button. It is not currently reachable —
 > the poll runs on its own five-minute schedule and the menu row is inert. Given

@@ -407,12 +407,18 @@ const char* const kMenuRows[MENU_ROWS] = {
     "Refresh interval",
     "Network",
     "Control panel",
-    "About",
 };
 
 // Geometry shared by the drawing and the hit test, so they cannot disagree.
-static constexpr int MENU_TOP = 44;
-static constexpr int MENU_ROW_H = 34;
+//
+// 34px rows were too small to hit reliably. This panel is about 160 px/inch, so
+// a 34px row is ~5.4mm — well under the ~7mm a fingertip wants. 46px is ~7.3mm.
+// Paying for it by dropping a row rather than by shrinking the margins: five
+// items at a comfortable size do not fit 240px, and four do.
+//
+// The version moved into the header, which is where "About" was going to live.
+static constexpr int MENU_TOP = 48;
+static constexpr int MENU_ROW_H = 46;
 static constexpr int MENU_X = 24;
 static constexpr int MENU_W = SCREEN_W - 48;
 
@@ -429,7 +435,7 @@ void uiMenu(int highlight) {
     g->setFont(&fonts::Font2);
     g->setTextDatum(top_left);
     g->setTextColor(C_DIM, C_BG);
-    g->drawString("MENU", MENU_X, 18);
+    g->drawString("usage-chan " FW_VERSION, MENU_X, 18);
     g->setTextDatum(top_right);
     g->drawString("tap outside to close", MENU_X + MENU_W, 18);
 

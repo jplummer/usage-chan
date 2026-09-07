@@ -172,6 +172,7 @@ void setup() {
     }
 
     settingsLoad(g_settings);
+    g_settings.brightness = halBootBrightness(g_settings.brightness);
     halSetBrightness(g_settings.brightness);
     uiSetHeaderLabel(g_settings.devName);
 
@@ -228,7 +229,7 @@ void loop() {
                     // Brightness is wired because it worked before the menu
                     // existed; orphaning it would be a regression. The rest are
                     // deliberately inert until the settings work lands.
-                    g_settings.brightness = (g_settings.brightness + 1) % 4;
+                    g_settings.brightness = halNextBrightness(g_settings.brightness);
                     halSetBrightness(g_settings.brightness);
                     settingsPutInt("brightness", g_settings.brightness);
                     uiMenu(-1);

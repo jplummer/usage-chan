@@ -656,6 +656,37 @@ Measured by wrapping the fetch in `millis()` deltas, logged as
 `[FETCH] ok in NNNms`. Kept in place — it costs nothing and it is how the next
 regression here gets caught.
 
+## Off must not be persistable
+
+Found on hardware 2026-09-07. Brightness cycled `(n + 1) % 4` across
+`{0, 48, 128, 255}` and wrote the result to NVS. Level 0 is a genuinely dark
+backlight, so a fourth tap stored a device that boots dark, every time, with no
+visible way back.
+
+**The bug was inherited, but the menu is what made it dangerous.** The same
+cycle sat on BtnA in phase 1, where "off, and the device keeps running" was a
+documented feature — and where a labelled button strip meant you could see
+nothing and still press the same button again. An invisible menu removes that:
+recovery now requires knowing the geometry rather than reading it.
+
+Two rules, and the second is the general principle:
+
+- **Cycling never lands on off.** It needs a deliberate act, not a fourth tap.
+- **A stored 0 boots visible.** Off is a runtime state a power cycle clears.
+
+Generally: *a control that can make the device appear broken must not be able to
+persist that state.* Worth applying to anything else that ends up in the menu —
+a refresh interval of "never", a WiFi setting that cannot connect.
+
+## Touch targets need ~7mm
+
+34px rows on this panel are about 5.4mm at ~160 px/inch, and were unreliable to
+hit. 46px is ~7.3mm and works.
+
+Five comfortable rows do not fit 240px and four do, so the menu lost a row
+rather than its margins. The version moved into the header, which is where an
+"About" row was headed anyway.
+
 ## Open questions
 
 - **Does a `claude setup-token` token carry the `user:profile` scope** that
