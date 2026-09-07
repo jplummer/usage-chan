@@ -11,9 +11,14 @@ of firmware is therefore about 1,170 lines of "Writing at 0x...".
 This runs esptool as a subprocess and rewrites those lines as they arrive.
 Everything else passes through untouched, including the exit code.
 
-Degrades on purpose: if our own stdout is not a TTY either — piped to a file, a
-CI log — carriage returns would be noise, so it prints a short line every 10%
-instead. Either way the wall of text is gone.
+Our own stdout is piped too — PlatformIO captures it — so isatty() is False here
+for the same reason it is False for esptool. Writing the spinner to stdout would
+just reproduce the problem one layer up. Instead the spinner goes to /dev/tty,
+the controlling terminal, which is reachable however stdout was redirected.
+
+Degrades on purpose: with no controlling terminal — a CI runner, a build hook —
+carriage returns would be noise, so it prints a short line every 10% instead.
+Either way the wall of text is gone.
 """
 import re
 import subprocess
@@ -29,6 +34,12 @@ FRAMES = "🌑🌒🌓🌔🌕🌖🌗🌘"
 # spinner, a flicker — and 109 terminal writes a second for no benefit. At 8fps
 # the eight moons complete one cycle per second, which reads as motion.
 REDRAW_INTERVAL = 0.125
+
+# Below this many blocks a file is written faster than anyone can read about it
+# — the bootloader and partition table are 15 and 3 blocks, done in a tenth of a
+# second. Reporting on them is clutter, and the "Wrote N bytes" line already
+# confirms they happened. Only the firmware, at ~1,165 blocks, is worth watching.
+MIN_BLOCKS = 30
 WRITING = re.compile(r"^Writing at 0x[0-9a-f]+\.\.\. \((\d+) %\)\s*$")
 
 
@@ -46,10 +57,18 @@ def main() -> int:
         errors="replace",
     )
 
-    tty = sys.stdout.isatty()
+    # Not sys.stdout: that is a pipe to PlatformIO. /dev/tty is the terminal the
+    # user is actually looking at, and opening it fails cleanly when there is
+    # none — which is the signal to fall back to periodic lines.
+    try:
+        tty_out = open("/dev/tty", "w")
+    except OSError:
+        tty_out = None
+    tty = tty_out is not None
     frame = 0
     last_draw = 0.0
     last_decade = -1
+    blocks = 0
     active = False   # a progress line is currently occupying the cursor's row
 
     assert proc.stdout is not None
@@ -58,13 +77,22 @@ def main() -> int:
         if not m:
             # Any other output ends the progress line and prints normally.
             if active and tty:
-                sys.stdout.write("\r\033[K")
+                tty_out.write("\r\033[K")
+                tty_out.flush()
                 active = False
+            # Each written file restarts progress at 0%. Without this reset the
+            # first file leaves last_decade at 10 and every later file — the
+            # 1.19MB firmware included — reports nothing at all.
+            last_decade = -1
+            blocks = 0
             sys.stdout.write(line)
             sys.stdout.flush()
             continue
 
         pct = int(m.group(1))
+        blocks += 1
+        if blocks < MIN_BLOCKS:
+            continue
         if tty:
             now = time.monotonic()
             # 100% always draws, so the bar never stops one frame short.
@@ -73,16 +101,18 @@ def main() -> int:
                 continue
             last_draw = now
             frame = (frame + 1) % len(FRAMES)
-            sys.stdout.write(f"\r\033[K  {FRAMES[frame]}  writing… {pct:3d}%")
-            sys.stdout.flush()
+            tty_out.write(f"\r\033[K  {FRAMES[frame]}  writing… {pct:3d}%")
+            tty_out.flush()
             active = True
         elif pct // 10 > last_decade:
             last_decade = pct // 10
             print(f"  writing… {last_decade * 10}%", flush=True)
 
     if active and tty:
-        sys.stdout.write("\r\033[K")
-        sys.stdout.flush()
+        tty_out.write("\r\033[K")
+        tty_out.flush()
+    if tty_out:
+        tty_out.close()
 
     return proc.wait()
 
