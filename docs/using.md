@@ -30,10 +30,22 @@ it is the budget (`62% left`) and the reset is a footnote. Below about 40% they
 swap: the clock becomes the headline, because the question has changed from
 *should I start this?* to *should I wait?*
 
-**The 7-day window is one line**, not a bar — it moves 1% per 100 minutes, so a
-bar for it would be furniture. It says `behind pace`, `on pace` or `ahead of
-pace`, which describes now rather than predicting Friday. It grows into a full
-bar only when the server says it is the binding limit.
+**A caption under the diamond says the same thing in words**: `well behind`,
+`a little behind`, `on pace`, `a little ahead`, or `well ahead`. It follows the
+diamond along the bar and describes now rather than predicting the end of the
+window. Behind is dim; ahead takes the bar's colour.
+
+**The 7-day window is a thin bar divided into sevenths.** Same block, same
+diamond, same caption, at a third the height. The divisions are a scale so the
+diamond has a position you can read on its own — they are not days of the week,
+because the window doesn't start at midnight. Its reset time sits at the right
+end of its label. It grows into a full bar only when the server says it is the
+binding limit.
+
+**Below 12% remaining the footnote says `nearly out`, and at zero it says
+`out`.** If you are in extra-usage billing the device does not yet know: it
+logs the overage headers on every fetch but shows nothing, until someone has
+read that log during an overage. See `docs/design-decisions.md`.
 
 > The utilization figures come straight from Anthropic; so does the answer to
 > which window is binding. If they disagree with `claude /usage`, believe
@@ -55,7 +67,7 @@ outside the menu rows to close it.
 
 | Menu row | Does |
 |---|---|
-| Brightness | Cycles dim → normal → bright |
+| Brightness | Five dots at the right end of the row; tap one |
 | Refresh interval | Nothing yet |
 | Network | Nothing yet |
 | Control panel | Nothing yet |
@@ -73,17 +85,18 @@ labelled on the screens that use them.
 | PIN entry | Advance digit | Confirm digit |
 | During boot | Hold both for 2s → factory reset | |
 
-Brightness survives a reboot — **except off**, deliberately.
+Brightness is chosen from five dots, the live one filled, and the choice
+survives a reboot. There is no off. Earlier firmware had one, and because
+brightness is persisted, a device that stored it booted dark forever with no
+visible way back: indistinguishable from broken hardware. The lowest dot is
+dim, not dark.
 
-Cycling goes dim → normal → bright and never lands on off. Level 0 really does
-cut the backlight, and because brightness is persisted, a device that stored 0
-would boot dark forever with no visible way back: indistinguishable from broken
-hardware. Off stays reachable for a nightstand at 2am, but it is a runtime state
-a power cycle clears, not something that can be saved into a corner.
+The brightness picked in the setup portal is no longer honoured — it writes the
+old 0–3 scale, which this firmware ignores in favour of the dots. The first boot
+after flashing comes up at the middle dot.
 
-> **If your screen is dark and the device seems alive**, it is probably this,
-> from firmware before the fix. Touch still works: tap the middle of the screen
-> to open the menu, then tap about a quarter of the way down to hit Brightness.
+> **If your screen is dark and the device seems alive**, it is from firmware
+> before the fix. Flash the current firmware, which comes up visible.
 
 > **Changed.** Refresh-now used to be a button. It is not currently reachable —
 > the poll runs on its own five-minute schedule and the menu row is inert. Given
@@ -99,7 +112,7 @@ largest gap in the product today and the LAN settings panel is the fix — see
 
 | Setting | Range | Changeable now? |
 |---|---|---|
-| Brightness | 0–3 | Yes, left button |
+| Brightness | five dots | Yes, in the menu |
 | Refresh interval | 2–15 min, default 5 | No — but a stored value from before the floor moved is treated as stale and falls back to the 5-minute default, so no re-provision is needed to get there |
 | WiFi credentials | | Only via the recovery portal, after three failed connects |
 | Token | | No. Factory reset only |

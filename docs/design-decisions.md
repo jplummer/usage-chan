@@ -336,6 +336,41 @@ of them.
 **Leaning (d), the diamond**, with (b) the notch as the alternative. The stroke
 spends ten pixels of height the bar would rather have.
 
+**Decided 2026-09-08: the diamond.** It shipped as the diamond and survived two
+days of use without complaint. Closed; the sketch keeps the other three for the
+record.
+
+### The caption under the diamond
+
+Decided 2026-09-08, from use. Colour said *ahead* and nothing connected that to
+the diamond, so the mark was doing its job for someone who already knew what it
+meant and nobody else. The fix is the cheapest form of the "legend as the real
+bar, annotated" idea: one caption, no leader line, riding under the diamond and
+explaining it by sitting on it.
+
+Five steps rather than three, keyed to the same breaks the colour uses so words
+and colour can never disagree:
+
+| Gap (util − elapsed) | Caption | Colour |
+|---|---|---|
+| < −15% | `well behind` | dim |
+| −15% to −2% | `a little behind` | dim |
+| ±2% | `on pace` | dim |
+| +2% to +15% | `a little ahead` | amber |
+| > +15% | `well ahead` | red |
+
+The three-word version (`behind pace · on pace · ahead of pace`) was the
+alternative, on the argument that colour already carries degree and every extra
+word runs into the bar's ends sooner. Five was chosen because "a little ahead"
+is the phrase that actually helps decide whether to keep going. Same rule on
+both bars, so the diamond is explained once.
+
+**The caption gets its own row.** A caption that tracks the diamond collides
+with a reset label on the same row for roughly the second half of every window,
+which is too often for any dodge to feel stable. So the rows under a bar are
+fixed: caption, then footnote. On the 7-day bar the reset label moved to the
+right end of the label row instead, which keeps its position meaning.
+
 ### The 7-day window gets a line, not a bar
 
 Decided 2026-09-07. The two windows want opposite treatments and were getting
@@ -366,6 +401,31 @@ same way message size is graded by invalidation.
 
 Accepted cost: the layout changes shape occasionally. It has to pass the same
 test as the single colour threshold — rare, and always for a reason.
+
+### Reversed 2026-09-08: a thin bar divided into sevenths
+
+Two days of use found the line invisible, and for a reason the reasoning above
+predicted without noticing: it nearly always read `behind pace`, and a thing
+that never changes gets tuned out. The argument against a 7-day *bar* was that
+it would look identical for days. The line looked identical for the same days,
+with less to look at.
+
+So it is now a thin bar, 8px against the 5-hour bar's 24, with the same
+right-anchored block and the same diamond, and six faint divisions at sevenths
+of the window. The gap between the markers moves, slowly, which is what the
+line lacked, and the divisions give the diamond a position that means something
+on its own — "Thursday-ish".
+
+Two things kept from the original decision. The divisions are a **scale, not
+data**: unlike the parked week strip they cannot lie about days the device was
+unplugged, because they encode nothing. And the window does not start at
+midnight, so the divisions sit at fixed sevenths and nothing labels them by
+name. Promotion to a full bar when the server says 7-day is binding stays.
+
+The hoarding worry stands in principle. A thin bar with a marker on it reads as
+a calendar rather than a gauge, which is the planning register the reset
+treatment was reaching for anyway. If it turns out to produce a safety buffer
+nobody spends, that is a finding worth recording here.
 
 ### Words assert, marks compare
 
@@ -686,6 +746,50 @@ Generally: *a control that can make the device appear broken must not be able to
 persist that state.* Worth applying to anything else that ends up in the menu —
 a refresh interval of "never", a WiFi setting that cannot connect.
 
+### 2026-09-08: chosen, not cycled
+
+Three steps were too few, and cycling was the wrong control from the start:
+you cannot see which tap you are on, and more steps make that worse. The row now
+shows five dots with the live one filled, and a tap on a dot applies it at once,
+so the choice is made by looking at the screen rather than by counting.
+
+Five levels at 16, 40, 96, 170 and 255, roughly even in perceived brightness.
+None is off. The scale lives under its own NVS key, `bright5`, because the old
+0–3 scale where 0 meant off is a different schema and an old value says nothing
+about this one; anything out of range falls back to the middle dot, the same
+treatment the refresh interval got.
+
+*Not yet done:* the CoreS3 carries an ambient light sensor on its front panel.
+If the Stack-Chan shell leaves it uncovered, auto-brightness would answer this
+and the nightstand-at-2am item at once. Unverified on hardware.
+
+## Overage — the device did not know
+
+Found in use 2026-09-08. The account went into extra-usage billing for a while,
+and the screen said `nearly out` throughout. Two bugs, different sizes.
+
+The small one needed no new data: below 12% remaining the footnote said
+`nearly out` all the way to zero, so at 100% used it was plainly false. It now
+says `out` at zero. The reset clock was already the headline there, which is
+right — nothing to decide but when.
+
+The large one is that nothing on the device knew overage existed. The headers
+for it arrive on every response already being parsed: an overall `status`, plus
+`overage-status`, `overage-utilization`, `overage-reset` and
+`overage-disabled-reason`. None were read, and nobody has captured what they
+look like while overage is active. Two things a display cannot be designed
+without knowing: whether `5h-utilization` sits at 1.0 during overage or climbs
+past it, and whether `overage-status` takes a distinct value or stays `allowed`
+while only `overage-utilization` moves.
+
+**So this is a spike, not a feature.** The five headers are now collected and
+written to the serial log on every fetch, and displayed nowhere. The next time
+the account crosses the wall, the log answers the questions above, and the
+display gets designed from the answer. The parked currency-symbol idea — a
+symbol past the right edge of the bar, where the geography already says *past
+here it costs money* — is the likely shape, with a headline that says you are
+paying rather than that you are out.
+
 ## Touch targets need ~7mm
 
 34px rows on this panel are about 5.4mm at ~160 px/inch, and were unreliable to
@@ -705,7 +809,8 @@ rather than its margins. The version moved into the header, which is where an
 - **Terms of service.** Consumer terms prohibit automated access except via an
   API key; `claude setup-token` is Anthropic's own automation command. See
   `data-inventory.md`. An account-owner call.
-- **Tick treatment (a), (b) or (c).** Leaning (b), the notch. See the sketch.
+- **What the overage headers do past the wall.** Logged since 2026-09-08,
+  captured never. Decides the overage display — see *Overage* above.
 - **How to show that buying through is available.** `extra_usage` and
   `overage-disabled-reason` are on the wire; the decision *"pay to continue?"* is
   real and needs warning in advance, not at the wall.

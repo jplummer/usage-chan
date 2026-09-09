@@ -73,23 +73,13 @@ int halBatPercent() {
     return (p < 0 || p > 100) ? -1 : p;
 }
 
+// Five levels, spread roughly evenly in perceived brightness rather than in
+// PWM value. None of them is off: this is a desk device for working hours, and
+// a screen you cannot see is a screen that is not doing its job. The old table
+// had a 0 that cut the backlight, and because brightness is persisted a device
+// that stored it booted dark forever, indistinguishable from broken hardware.
+// The lowest level here is dim, not dark.
 void halSetBrightness(uint8_t level) {
-    static const uint8_t table[4] = {0, 48, 128, 255};
-    lcd.setBrightness(table[level > 3 ? 3 : level]);
-}
-
-// Level 0 is a genuinely off backlight, and brightness is persisted — so a
-// device that stores 0 boots dark, every time, with no visible way back. That
-// is indistinguishable from broken hardware.
-//
-// There is no "off" in this product. It is a desk device for working hours, and
-// a screen you cannot see is a screen that is not doing its job. Level 0 stays
-// in the table only so an old stored value maps to something.
-uint8_t halNextBrightness(uint8_t level) {
-    return (level >= 3 || level == 0) ? 1 : (uint8_t)(level + 1);
-}
-
-uint8_t halBootBrightness(uint8_t stored) {
-    // Whatever is in NVS, come up visible.
-    return stored == 0 ? 2 : stored;
+    static const uint8_t table[BRIGHTNESS_LEVELS] = {16, 40, 96, 170, 255};
+    lcd.setBrightness(table[level >= BRIGHTNESS_LEVELS ? BRIGHTNESS_LEVELS - 1 : level]);
 }

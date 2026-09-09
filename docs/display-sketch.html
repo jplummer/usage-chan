@@ -199,11 +199,24 @@
       one is answered by a clock. The bar keeps carrying the amount throughout,
       which is the honest way to be imprecise about it.</dd>
 
-      <dt>the 7-day window is a line, not a bar</dt>
-      <dd>It moves 1% per 100 minutes, so a bar for it is seen hundreds of times
-      per window and looks identical nearly every time — wallpaper. It promotes
-      to a full bar only when <code>representative-claim</code> says it is the
-      binding limit, which was 23% of requests in a 37,000-request capture.</dd>
+      <dt>the caption says what the gap shows</dt>
+      <dd>Five phrases under the diamond, keyed to the same breaks the colour
+      uses: <em>well behind · a little behind · on pace · a little ahead · well
+      ahead</em>. It rides with the diamond and stops at the bar's ends. Behind
+      is dim; ahead takes the bar's colour. Same rule on both bars, so the
+      diamond only has to be explained once.</dd>
+
+      <dt>the 7-day window is a thin bar in sevenths</dt>
+      <dd>It moves 1% per 100 minutes, and as a one-line phrase it was invisible
+      — it nearly always said "behind pace", and a thing that never changes gets
+      tuned out. As a thin bar the gap between the markers moves, and the
+      divisions give the diamond a position on its own. They are a scale, not
+      data, so they cannot lie about days the device was unplugged. It still
+      promotes to a full bar when <code>representative-claim</code> says it is
+      the binding limit.</dd>
+
+      <dt>the diamond is the tick</dt>
+      <dd>Decided after use. The four treatments below are kept for the record.</dd>
 
       <dt>a message is as big as what it invalidates</dt>
       <dd>Weak signal costs you nothing but latency, so it is a small glyph.
@@ -273,17 +286,43 @@
     return far;
   }
 
+  // The caption rides under the diamond and says in words what the gap between
+  // the markers shows. Five steps, keyed to the same breaks the colour uses, so
+  // words and colour can never disagree. Behind and on-pace are dim; ahead
+  // takes the bar's colour.
+  function paceWords(u,e){
+    const d=u-e;
+    if(d >  0.15) return {t:'well ahead',      c:D.crit};
+    if(d >  0.02) return {t:'a little ahead',  c:D.warn};
+    if(d < -0.15) return {t:'well behind',     c:D.dim};
+    if(d < -0.02) return {t:'a little behind', c:D.dim};
+    return {t:'on pace', c:D.dim};
+  }
+  // Centred on the tick, clamped so it never leaves the bar's ends. Width is
+  // estimated for a monospace 11px face; the firmware measures the real string.
+  function caption(y,u,e){
+    const w=paceWords(u,e), half=w.t.length*6.6/2;
+    const x=Math.max(BX+half, Math.min(BX+BW-half, BX+BW*e));
+    return `<text x="${x}" y="${y}" fill="${w.c}" font-family="monospace"
+                  font-size="11" text-anchor="middle">${w.t}</text>`;
+  }
+
   function block(y,label,u,e,txtFar,txtNear,txtNow,treat){
     const edge=BX+BW*u, tx=BX+BW*e, col=barColor(u,e);
     const rem=(1-u)*100;
     const plenty = rem >= CROSSOVER;
 
     // Headline slot and footnote slot trade contents at the crossover.
+    // "nearly out" claims proximity, and "out" claims arrival — a device in
+    // overage said "nearly out" at zero remaining, which was plainly false.
     const headline = plenty ? Math.round(rem)+'% left'
                             : resetFor(rem, txtFar, txtNear, txtNow).replace(/^resets /,'');
     const footnote = plenty ? resetFor(rem, txtFar, txtNear, txtNow)
-                            : (rem < 12 ? 'nearly out' : '');
+                            : (rem <= 0 ? 'out' : rem < 12 ? 'nearly out' : '');
 
+    // Rows under the bar are fixed: caption first, then the footnote. A caption
+    // that tracks the diamond would collide with a reset label on the same row
+    // for half of every window, which is too often for any dodge to feel stable.
     return `
       <text x="${BX}" y="${y+10}" fill="${D.dim}" font-family="monospace"
             font-size="10" letter-spacing="1.1">${label}</text>
@@ -295,8 +334,9 @@
       <rect x="${edge}" y="${y+26}" width="${Math.max(BW-BW*u,0)}" height="${BH}"
             rx="4" fill="${col}"/>
       ${tick(tx, y+26, BH, treat)}
+      ${caption(y+60,u,e)}
 
-      <text x="${BX+BW}" y="${y+62}" fill="${rem<12?D.warn:D.dim}"
+      <text x="${BX+BW}" y="${y+76}" fill="${rem<12?D.warn:D.dim}"
             font-family="monospace" font-size="11"
             text-anchor="end">${footnote}</text>`;
   }
@@ -342,19 +382,35 @@
             text-anchor="middle">no network</text>`;
   }
 
-  // The 7-day window is one quiet line by default: no bar, no percentage, and
-  // no gauge to habituate to. Words state facts; the pace phrase describes NOW,
-  // not Friday, so it needs no "at your current pace" hedge.
-  function sevenDayLine(y,u7,e7){
-    const d=u7-e7;
-    const phrase = d > 0.02 ? 'ahead of pace' : d < -0.02 ? 'behind pace' : 'on pace';
-    const col    = d > 0.15 ? D.crit : d > 0.02 ? D.warn : D.dim;
-    return `<text x="${BX}" y="${y}" fill="${D.dim}" font-family="monospace"
+  // The 7-day window as a thin bar divided into sevenths. This replaces the
+  // one-line version, which turned out to be invisible: it almost always read
+  // "behind pace", and a thing that never changes gets tuned out. A bar shows
+  // the gap between the markers, which does move, and the divisions give the
+  // diamond a position that means something on its own — "Thursday-ish".
+  //
+  // The divisions are a scale, not data: unlike a per-day history they cannot
+  // lie about days the device was unplugged. They sit at fixed sevenths of the
+  // window, which does not start at midnight, so nothing labels them by name.
+  // The reset label sits at the right end of the row above, keeping the
+  // position meaning while leaving the caption row free.
+  function sevenDayBar(y,u7,e7,treat){
+    const TH=8, ty=y+18;
+    const edge=BX+BW*u7, tx=BX+BW*e7, col=barColor(u7,e7);
+    let ticks='';
+    for(let i=1;i<7;i++){
+      const x=BX+BW*i/7;
+      ticks+=`<rect x="${x-0.5}" y="${ty}" width="1" height="${TH}" fill="${D.bg}"/>`;
+    }
+    return `<text x="${BX}" y="${y+10}" fill="${D.dim}" font-family="monospace"
                   font-size="10" letter-spacing="1.1">7-DAY</text>
-            <text x="${BX+52}" y="${y}" fill="${col}" font-family="monospace"
-                  font-size="11">${phrase}</text>
-            <text x="${BX+BW}" y="${y}" fill="${D.dim}" font-family="monospace"
-                  font-size="11" text-anchor="end">resets Friday</text>`;
+            <text x="${BX+BW}" y="${y+10}" fill="${D.dim}" font-family="monospace"
+                  font-size="11" text-anchor="end">resets Fri 1pm</text>
+            <rect x="${BX}" y="${ty}" width="${BW}" height="${TH}" rx="3" fill="${D.card}"/>
+            <rect x="${edge}" y="${ty}" width="${Math.max(BW-BW*u7,0)}" height="${TH}"
+                  rx="3" fill="${col}"/>
+            ${ticks}
+            ${tick(tx, ty, TH, treat)}
+            ${caption(y+42,u7,e7)}`;
   }
 
   function screen(u,e,treat,state,promote){
@@ -362,11 +418,11 @@
     let out = `<rect width="320" height="240" fill="${D.bg}"/>`;
     if(promote){
       // 7-day is the binding constraint. Same geometry, equal billing.
-      out += block(24, '5-HOUR', u,  e,  'resets 3:40pm', 'resets 3:40pm', 'resets in 12m', treat)
-           + block(126,'7-DAY',  u7, e7, 'resets Friday', 'resets Fri 1pm','resets 1:07pm', treat);
+      out += block(12, '5-HOUR', u,  e,  'resets 3:40pm', 'resets 3:40pm', 'resets in 12m', treat)
+           + block(104,'7-DAY',  u7, e7, 'resets Friday', 'resets Fri 1pm','resets 1:07pm', treat);
     } else {
-      out += block(56, '5-HOUR', u, e, 'resets 3:40pm', 'resets 3:40pm', 'resets in 12m', treat)
-           + sevenDayLine(176, u7, e7);
+      out += block(36, '5-HOUR', u, e, 'resets 3:40pm', 'resets 3:40pm', 'resets in 12m', treat)
+           + sevenDayBar(136, u7, e7, treat);
     }
     if(state==='weak')    out += wifi(300,224,1.0,D.warn,false);
     if(state==='service') out += serviceBadge();

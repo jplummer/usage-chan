@@ -230,7 +230,8 @@ finished. Every entry here is a lie the device currently tells.
 | Claude service status | The menu will report "no service issues" without asking anyone | The status-fetch design in `design-decisions.md`: detect with our own request outcomes, name with status.claude.com |
 | Reset times | Shown as durations, not wall clocks | A timezone. `tzMin` defaults to 0, which is a real offset rather than a marker for unknown, so the clock is gated behind `tzSet` |
 | Menu rows | "Refresh interval", "Network" and "Control panel" do nothing | Track C, mostly |
-| Extra usage | Never detected | Two more strings in `RL_HEADERS[]`, then the currency symbol |
+| Extra usage | Says `out` at the wall and nothing about paying. Was saying `nearly out` during an actual overage | The five overage headers are logged since 2026-09-08 but never captured during an overage. Read the log next time, then design the currency symbol from what it shows |
+| Portal brightness | The setup portal offers a brightness choice | It writes the old 0–3 key, which the firmware ignores. Honour it, or drop the field when the portal is reworked (track B) |
 
 ## Parked ideas
 

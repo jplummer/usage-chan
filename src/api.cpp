@@ -23,8 +23,20 @@ static const char* RL_HEADERS[] = {
     "anthropic-ratelimit-unified-7d-utilization",
     "anthropic-ratelimit-unified-7d-reset",
     "anthropic-ratelimit-unified-representative-claim",
+    // Collected and logged only, not yet displayed. The device once said
+    // "nearly out" while the account was in overage, and nothing here knew.
+    // Nobody has captured what these look like while overage is active —
+    // whether 5h-utilization sits at 1.0 or climbs past it, and whether
+    // overage-status changes value — so the log is the spike that decides
+    // the display. Values seen so far: status and overage-status are
+    // allowed | allowed_warning | rejected.
+    "anthropic-ratelimit-unified-status",
+    "anthropic-ratelimit-unified-overage-status",
+    "anthropic-ratelimit-unified-overage-utilization",
+    "anthropic-ratelimit-unified-overage-reset",
+    "anthropic-ratelimit-unified-overage-disabled-reason",
 };
-static const int RL_HEADER_COUNT = 5;
+static const int RL_HEADER_COUNT = 10;
 
 bool fetchUsage(const char* token, UsageData& out) {
     WiFiClientSecure client;
@@ -69,6 +81,17 @@ bool fetchUsage(const char* token, UsageData& out) {
     Serial.printf("[API] 5h: %s  7d: %s\n", h5u.c_str(), d7u.c_str());
     Serial.printf("[API] 5h_reset: %s  7d_reset: %s\n", h5r.c_str(), d7r.c_str());
     Serial.printf("[API] binding: %s\n", claim.length() ? claim.c_str() : "(absent)");
+
+    // Overage spike: one log line per fetch so the wire's behaviour past the
+    // wall can be read off the serial console. Absent headers print as "-".
+    auto hdr = [&](const char* suffix) {
+        String v = https.header((String("anthropic-ratelimit-unified-") + suffix).c_str());
+        return v.length() ? v : String("-");
+    };
+    Serial.printf("[API] status: %s  overage: status=%s util=%s reset=%s disabled=%s\n",
+                  hdr("status").c_str(), hdr("overage-status").c_str(),
+                  hdr("overage-utilization").c_str(), hdr("overage-reset").c_str(),
+                  hdr("overage-disabled-reason").c_str());
 
     https.end();
 

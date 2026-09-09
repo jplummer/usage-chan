@@ -23,7 +23,8 @@ struct Settings {
     EncryptedBlob blob;
     bool          hasBlob;
     int32_t       pollSec;      // i32, 30..300
-    uint8_t       brightness;   // stored as i32, 0..3
+    uint8_t       brightness;   // u8 under "bright5", 0..4. The i32 "brightness"
+                                // key (0..3, 0 = off) is an abandoned schema
     char          devName[33];
     int32_t       tzMin;        // i32, minutes east of UTC, -840..840
     uint8_t       tzSet;        // u8, whether tzMin was ever chosen. 0 is a

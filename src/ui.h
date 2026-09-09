@@ -36,11 +36,16 @@ void uiError(const char* title, const char* detail = nullptr);
 extern const char* const kMenuRows[MENU_ROWS];
 
 // Draws the menu. `highlight` is the row under the finger, or -1 for none.
-void uiMenu(int highlight);
+// `brightness` is the live level, shown as the filled dot on the first row.
+void uiMenu(int highlight, uint8_t brightness);
 
 // Returns the row index at a touch point, or -1 if the touch was outside the
 // rows (which the caller treats as "close").
 int  uiMenuRowAt(int x, int y);
+
+// For a tap on the Brightness row: which of the dots it landed on, or -1 if it
+// hit the label instead, which does nothing.
+int  uiMenuBrightnessDotAt(int x);
 
 // Header label, from the device name set in the captive portal. Empty falls
 // back to "USAGE-CHAN". Unused by the dashboard now that the title stripe is

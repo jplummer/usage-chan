@@ -39,7 +39,10 @@ void settingsLoad(Settings& s) {
     s.pollSec = (storedPoll < MIN_POLL_SEC || storedPoll > MAX_POLL_SEC)
                     ? DEFAULT_POLL_SEC
                     : storedPoll;
-    s.brightness = constrain(prefs.getInt("brightness", DEFAULT_BRIGHTNESS), 0, 3);
+    // "brightness" (i32, 0..3, 0 = off) is the old schema and is ignored. The
+    // five-dot scale lives under "bright5"; out of range is stale, not near.
+    uint8_t storedBright = prefs.getUChar("bright5", DEFAULT_BRIGHTNESS);
+    s.brightness = storedBright >= BRIGHTNESS_LEVELS ? DEFAULT_BRIGHTNESS : storedBright;
     prefs.getString("dev_name", s.devName, sizeof(s.devName));
     s.tzMin      = constrain(prefs.getInt("tz_min", 0), -840, 840);
     s.tzSet      = prefs.getUChar("tz_set", 0) ? 1 : 0;

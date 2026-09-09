@@ -53,7 +53,11 @@
 // height of the on-screen hint row that shows the user where to press.
 #define TOUCH_BTN_H             36
 
-#define DEFAULT_BRIGHTNESS      2        // 0=off 1=dim 2=normal 3=bright
+// Five levels, none of them off, chosen from a row of dots in the menu. Stored
+// under its own NVS key ("bright5") because the old 0..3 scale, where 0 meant
+// off, is a different schema; an old value is not information about this one.
+#define BRIGHTNESS_LEVELS       5
+#define DEFAULT_BRIGHTNESS      2        // the middle dot
 
 // ── Network ──────────────────────────────────────────────
 #define WIFI_CONNECT_TIMEOUT_S  20

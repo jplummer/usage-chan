@@ -26,10 +26,7 @@ bool halBtnAIsPressed();
 bool halBtnBIsPressed();
 
 int  halBatPercent();
-void halSetBrightness(uint8_t level);   // 0..3, mapped to panel 0/48/128/255
-
-// There is no "off". Level 0 is a dark backlight and brightness is persisted, so
-// a stored 0 boots dark forever with no visible way back — and a screen you
-// cannot see is not doing its job on a desk device.
-uint8_t halNextBrightness(uint8_t level);   // cycles 1->2->3->1, never 0
-uint8_t halBootBrightness(uint8_t stored);  // a stored 0 comes up visible
+// 0..BRIGHTNESS_LEVELS-1, mapped to panel 16/40/96/170/255. There is no off:
+// the lowest level is dim, because a stored "off" once booted a device dark
+// with no visible way back.
+void halSetBrightness(uint8_t level);

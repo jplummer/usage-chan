@@ -172,7 +172,6 @@ void setup() {
     }
 
     settingsLoad(g_settings);
-    g_settings.brightness = halBootBrightness(g_settings.brightness);
     halSetBrightness(g_settings.brightness);
     uiSetHeaderLabel(g_settings.devName);
     uiSetTimezoneKnown(g_settings.tzSet != 0);
@@ -220,29 +219,33 @@ void loop() {
         if (s_screen == SCREEN_MENU) {
             if (t.isPressed()) {
                 int row = uiMenuRowAt(t.x, t.y);
-                if (row != s_hot) { s_hot = row; uiMenu(s_hot); }
+                if (row != s_hot) { s_hot = row; uiMenu(s_hot, g_settings.brightness); }
             } else if (t.wasClicked()) {
                 int row = uiMenuRowAt(t.x, t.y);
                 s_hot = -1;
                 if (row < 0) {
                     s_screen = SCREEN_DASH;              // tap outside closes
                 } else if (row == 0) {
-                    // Brightness is wired because it worked before the menu
-                    // existed; orphaning it would be a regression. The rest are
-                    // deliberately inert until the settings work lands.
-                    g_settings.brightness = halNextBrightness(g_settings.brightness);
-                    halSetBrightness(g_settings.brightness);
-                    settingsPutInt("brightness", g_settings.brightness);
-                    uiMenu(-1);
+                    // Brightness is chosen from a row of dots, applied at once
+                    // and persisted. A tap on the row's label does nothing. The
+                    // other rows are deliberately inert until the settings
+                    // work lands.
+                    int dot = uiMenuBrightnessDotAt(t.x);
+                    if (dot >= 0) {
+                        g_settings.brightness = (uint8_t)dot;
+                        halSetBrightness(g_settings.brightness);
+                        settingsPutU8("bright5", g_settings.brightness);
+                    }
+                    uiMenu(-1, g_settings.brightness);
                 } else {
                     Serial.printf("[MENU] %s (not wired up yet)\n", kMenuRows[row]);
-                    uiMenu(-1);
+                    uiMenu(-1, g_settings.brightness);
                 }
             }
         } else if (t.wasClicked()) {
             s_screen = SCREEN_MENU;
             s_hot = -1;
-            uiMenu(-1);
+            uiMenu(-1, g_settings.brightness);
         }
     }
 

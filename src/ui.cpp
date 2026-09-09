@@ -118,10 +118,42 @@ static void drawPaceTick(int cx, int cy, uint16_t halo, uint16_t ink) {
     }
 }
 
+// The caption under the diamond says in words what the gap between the markers
+// shows. Five steps, keyed to the same breaks paceColor() uses, so words and
+// colour can never disagree. Behind and on-pace are dim; ahead takes the bar's
+// colour, because ahead is the one state worth noticing.
+//
+// Centred on the tick and clamped to the bar's ends. It gets its own row: a
+// caption that tracks the diamond would collide with a reset label on the same
+// row for half of every window, which is too often for any dodge to feel
+// stable.
+static void drawPaceCaption(int bx, int bw, int y, float util, float elapsed) {
+    const float d = util - elapsed;
+    const char* txt;
+    uint16_t    col;
+    if      (d >  0.15f) { txt = "well ahead";      col = C_CRIT; }
+    else if (d >  0.02f) { txt = "a little ahead";  col = C_WARN; }
+    else if (d < -0.15f) { txt = "well behind";     col = C_DIM;  }
+    else if (d < -0.02f) { txt = "a little behind"; col = C_DIM;  }
+    else                 { txt = "on pace";         col = C_DIM;  }
+
+    g->setFont(&fonts::Font2);
+    const int half = g->textWidth(txt) / 2;
+    int cx = bx + (int)(bw * elapsed + 0.5f);
+    if (cx < bx + half)      cx = bx + half;
+    if (cx > bx + bw - half) cx = bx + bw - half;
+    g->setTextDatum(top_center);
+    g->setTextColor(col, C_BG);
+    g->drawString(txt, cx, y);
+}
+
 // One window as a full bar. The bar IS the window: its left edge is when the
 // window opened, its right edge is both exhaustion and reset. Remaining budget
 // is anchored right, so spending pushes its left edge rightward — and the pace
 // tick travels rightward too. Time flies like an arrow.
+//
+// Vertical layout from y (the label's top): headline overshoots to y-6, bar at
+// y+38..y+62, caption row at y+66, footnote row at y+81. About 97px in all.
 static void drawWindowBar(int y, const char* label, float util,
                           uint32_t resetEpoch, uint32_t windowSec, bool valid) {
     const int bx = 16, bw = SCREEN_W - 32, bh = 24;
@@ -164,56 +196,80 @@ static void drawWindowBar(int y, const char* label, float util,
             uint16_t col = (e >= 0.0f) ? paceColor(u / 100.0f, e) : C_OK;
             g->fillRoundRect(edge, by, wRem, bh, 5, col);
         }
-        if (e >= 0.0f) drawPaceTick(bx + (int)(bw * e + 0.5f), by + bh / 2, C_BG, C_TEXT);
+        if (e >= 0.0f) {
+            drawPaceTick(bx + (int)(bw * e + 0.5f), by + bh / 2, C_BG, C_TEXT);
+            drawPaceCaption(bx, bw, by + bh + 4, u / 100.0f, e);
+        }
     }
 
     // Footnote: the clock while there is plenty, a proximity warning when there
     // is not. "nearly out" claims closeness, not a fraction, so it cannot be
-    // wrong by a factor of two the way "about a third left" was.
+    // wrong by a factor of two the way "about a third left" was. And "out"
+    // claims arrival: a device in overage once said "nearly out" at zero
+    // remaining, which was plainly false.
     g->setFont(&fonts::Font2);
     g->setTextDatum(top_right);
+    const int fy = by + bh + 19;
     if (valid && plenty && haveReset) {
         char line[32];
         snprintf(line, sizeof(line), "resets %s", resetTxt);
         g->setTextColor(C_DIM, C_BG);
-        g->drawString(line, bx + bw, by + bh + 8);
+        g->drawString(line, bx + bw, fy);
+    } else if (valid && rem <= 0.0f) {
+        g->setTextColor(C_WARN, C_BG);
+        g->drawString("out", bx + bw, fy);
     } else if (valid && rem < 12.0f) {
         g->setTextColor(C_WARN, C_BG);
-        g->drawString("nearly out", bx + bw, by + bh + 8);
+        g->drawString("nearly out", bx + bw, fy);
     }
 }
 
-// The 7-day window as one quiet line. It moves 1% per 100 minutes, so a bar for
-// it is seen hundreds of times per window looking identical every time — the
-// wallpaper an ambient display gets tuned out and then unplugged for.
+// The 7-day window as a thin bar divided into sevenths. It replaced a one-line
+// phrase that turned out to be invisible in use: it nearly always read "behind
+// pace", and a thing that never changes gets tuned out. A bar shows the gap
+// between the markers, which does move, and the divisions give the diamond a
+// position that means something on its own — "Thursday-ish".
 //
-// The pace phrase describes NOW, not Friday, so it is provisional without
-// needing an "at your current pace" hedge that would be too long to glance at.
-static void drawSevenDayLine(int y, const UsageData& d) {
-    const int bx = 16, bw = SCREEN_W - 32;
+// The divisions are a scale, not data: unlike a per-day history they cannot
+// lie about days the device was unplugged. They sit at fixed sevenths of the
+// window, which does not start at midnight, so nothing labels them by name.
+//
+// The reset label sits at the right end of the label row rather than under the
+// bar, which keeps its position meaning and leaves the caption row free.
+// Layout from y: label row at y, bar at y+20..y+28, caption at y+34.
+static void drawSevenDayBar(int y, const UsageData& d) {
+    const int bx = 16, bw = SCREEN_W - 32, bh = 8;
     g->setFont(&fonts::Font2);
     g->setTextDatum(top_left);
     g->setTextColor(C_DIM, C_BG);
     g->drawString("7-DAY", bx, y);
 
-    if (!d.ok) return;
-
-    float e = elapsedFraction(d.d7ResetEpoch, WIN_7D);
-    if (e >= 0.0f) {
-        float diff = (d.d7 / 100.0f) - e;
-        const char* phrase = diff > 0.02f ? "ahead of pace"
-                           : diff < -0.02f ? "behind pace" : "on pace";
-        g->setTextColor(diff > 0.15f ? C_CRIT : diff > 0.02f ? C_WARN : C_DIM, C_BG);
-        g->drawString(phrase, bx + 58, y);
-    }
-
     char resetTxt[24];
-    if (fmtReset(d.d7ResetEpoch, resetTxt, sizeof(resetTxt), true)) {
+    if (d.ok && fmtReset(d.d7ResetEpoch, resetTxt, sizeof(resetTxt), true)) {
         char line[32];
         snprintf(line, sizeof(line), "resets %s", resetTxt);
         g->setTextDatum(top_right);
-        g->setTextColor(C_DIM, C_BG);
         g->drawString(line, bx + bw, y);
+    }
+
+    const int by = y + 20;
+    g->fillRoundRect(bx, by, bw, bh, 3, C_CARD);
+    if (!d.ok) return;
+
+    float e = elapsedFraction(d.d7ResetEpoch, WIN_7D);
+    float u = d.d7 < 0 ? 0 : (d.d7 > 100 ? 100 : d.d7);
+    int edge = bx + (int)(bw * u / 100.0f + 0.5f);
+    int wRem = bx + bw - edge;
+    if (wRem > 0) {
+        uint16_t col = (e >= 0.0f) ? paceColor(u / 100.0f, e) : C_OK;
+        g->fillRoundRect(edge, by, wRem, bh, 3, col);
+    }
+    for (int i = 1; i < 7; i++) {
+        g->drawFastVLine(bx + bw * i / 7, by, bh, C_BG);
+    }
+    if (e >= 0.0f) {
+        drawPaceTick(bx + (int)(bw * e + 0.5f), by + bh / 2, C_BG, C_TEXT);
+        drawPaceCaption(bx, bw, by + bh + 6, u / 100.0f, e);
     }
 }
 
@@ -437,16 +493,17 @@ void uiDashboard(const UsageData& data, unsigned long lastFetchMs, int rssi,
     // so most of the time the 5-hour window gets the display to itself.
     const bool sevenBinds = data.ok && strncmp(data.claim, "seven_day", 9) == 0;
 
-    // Vertical placement. Content ran 56..200 against a 240px panel, leaving
-    // 56 above and 40 below — visibly bottom-heavy. Shifted up 12px, which also
-    // nudges past geometric centre: the bar carries the visual mass, and optical
-    // centre for a heavy element sits slightly above the middle.
+    // Vertical placement. Each full bar now carries two rows beneath it (the
+    // caption, then the footnote), so the blocks are taller than they were and
+    // the budget is tight: two full bars end at 213 against a status line at
+    // 222. The normal layout has room to spare, so the 5-hour block sits a
+    // little above centre, where a heavy element's optical centre wants to be.
     if (sevenBinds) {
-        drawWindowBar(22,  "5-HOUR", data.h5, data.h5ResetEpoch, WIN_5H, data.ok);
-        drawWindowBar(122, "7-DAY",  data.d7, data.d7ResetEpoch, WIN_7D, data.ok);
+        drawWindowBar(16,  "5-HOUR", data.h5, data.h5ResetEpoch, WIN_5H, data.ok);
+        drawWindowBar(116, "7-DAY",  data.d7, data.d7ResetEpoch, WIN_7D, data.ok);
     } else {
-        drawWindowBar(50, "5-HOUR", data.h5, data.h5ResetEpoch, WIN_5H, data.ok);
-        drawSevenDayLine(174, data);
+        drawWindowBar(40, "5-HOUR", data.h5, data.h5ResetEpoch, WIN_5H, data.ok);
+        drawSevenDayBar(150, data);
     }
 
     // Failure is graded by how much of the screen it makes untrue, and staleness
@@ -462,7 +519,7 @@ void uiDashboard(const UsageData& data, unsigned long lastFetchMs, int rssi,
     if (age < 0) {
         g->setTextColor(C_DIM, C_BG);
         g->drawString(err[0] ? "no reading yet — retrying" : "waiting for first reading",
-                      16, 216);
+                      16, 222);
     } else {
         char sline[64];
         char ago[16];
@@ -478,10 +535,10 @@ void uiDashboard(const UsageData& data, unsigned long lastFetchMs, int rssi,
             snprintf(sline, sizeof(sline), "updated %s ago", ago);
             g->setTextColor(C_DIM, C_BG);
         }
-        g->drawString(sline, 16, 216);
+        g->drawString(sline, 16, 222);
     }
 
-    if (fetching) drawSpinner(SCREEN_W - 26, 216);
+    if (fetching) drawSpinner(SCREEN_W - 26, 222);
     flush();
 }
 
@@ -512,7 +569,30 @@ int uiMenuRowAt(int x, int y) {
     return (row >= 0 && row < MENU_ROWS) ? row : -1;
 }
 
-void uiMenu(int highlight) {
+// Brightness is chosen, not cycled. Five dots at the right end of the row, the
+// live one filled; tapping a dot applies it at once, so you pick by looking at
+// the screen rather than by counting taps. Each dot owns a 40px-wide column
+// spanning the full row height, which is about 6.4mm by 7.3mm on this panel.
+static constexpr int DOT_PITCH = 40;
+static constexpr int DOT_X0    = MENU_X + MENU_W - 16 - DOT_PITCH * BRIGHTNESS_LEVELS + DOT_PITCH / 2;
+
+int uiMenuBrightnessDotAt(int x) {
+    int rel = x - (DOT_X0 - DOT_PITCH / 2);
+    if (rel < 0) return -1;
+    int i = rel / DOT_PITCH;
+    return i < BRIGHTNESS_LEVELS ? i : -1;
+}
+
+static void drawBrightnessDots(int cy, uint8_t level, bool rowLit) {
+    const uint16_t ink = rowLit ? C_BG : C_TEXT;
+    for (int i = 0; i < BRIGHTNESS_LEVELS; i++) {
+        int cx = DOT_X0 + i * DOT_PITCH;
+        if (i == level) g->fillCircle(cx, cy, 7, ink);
+        else            g->drawCircle(cx, cy, 6, ink);
+    }
+}
+
+void uiMenu(int highlight, uint8_t brightness) {
     g->fillScreen(C_BG);
 
     g->setFont(&fonts::Font2);
@@ -530,6 +610,7 @@ void uiMenu(int highlight) {
         g->setTextDatum(middle_left);
         g->setTextColor(on ? C_BG : C_TEXT, on ? C_ACCENT : C_CARD);
         g->drawString(kMenuRows[i], MENU_X + 16, y + MENU_ROW_H / 2);
+        if (i == 0) drawBrightnessDots(y + MENU_ROW_H / 2, brightness, on);
     }
     flush();
 }
