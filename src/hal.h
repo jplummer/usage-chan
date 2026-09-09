@@ -26,7 +26,7 @@ bool halBtnAIsPressed();
 bool halBtnBIsPressed();
 
 int  halBatPercent();
-// 0..BRIGHTNESS_LEVELS-1, mapped to panel 16/40/96/170/255. There is no off:
+// 0..BRIGHTNESS_LEVELS-1, mapped to panel 32/64/110/175/255. There is no off:
 // the lowest level is dim, because a stored "off" once booted a device dark
 // with no visible way back.
 void halSetBrightness(uint8_t level);

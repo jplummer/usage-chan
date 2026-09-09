@@ -78,8 +78,8 @@ int halBatPercent() {
 // a screen you cannot see is a screen that is not doing its job. The old table
 // had a 0 that cut the backlight, and because brightness is persisted a device
 // that stored it booted dark forever, indistinguishable from broken hardware.
-// The lowest level here is dim, not dark.
+// The lowest level here is dim, not dark: 16 was too dim to read in a lit room.
 void halSetBrightness(uint8_t level) {
-    static const uint8_t table[BRIGHTNESS_LEVELS] = {16, 40, 96, 170, 255};
+    static const uint8_t table[BRIGHTNESS_LEVELS] = {32, 64, 110, 175, 255};
     lcd.setBrightness(table[level >= BRIGHTNESS_LEVELS ? BRIGHTNESS_LEVELS - 1 : level]);
 }

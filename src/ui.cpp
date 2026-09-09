@@ -571,10 +571,11 @@ int uiMenuRowAt(int x, int y) {
 
 // Brightness is chosen, not cycled. Five dots at the right end of the row, the
 // live one filled; tapping a dot applies it at once, so you pick by looking at
-// the screen rather than by counting taps. Each dot owns a 40px-wide column
-// spanning the full row height, which is about 6.4mm by 7.3mm on this panel.
-static constexpr int DOT_PITCH = 40;
-static constexpr int DOT_X0    = MENU_X + MENU_W - 16 - DOT_PITCH * BRIGHTNESS_LEVELS + DOT_PITCH / 2;
+// the screen rather than by counting taps. Each dot owns a 36px-wide column
+// spanning the full row height, about 5.7mm by 7.3mm on this panel. 40px
+// columns ran the first dot into the "Brightness" label.
+static constexpr int DOT_PITCH = 36;
+static constexpr int DOT_X0    = MENU_X + MENU_W - 10 - DOT_PITCH * BRIGHTNESS_LEVELS + DOT_PITCH / 2;
 
 int uiMenuBrightnessDotAt(int x) {
     int rel = x - (DOT_X0 - DOT_PITCH / 2);

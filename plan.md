@@ -339,6 +339,11 @@ pixels on the dashboard answering it forever.
 - **A real PIN keypad.** Four digits at one-tap-per-increment is up to 36 taps. A 320x240 touchscreen can show ten targets; it just needs raw touch coordinates rather than the three-button abstraction
 - **Token expiry.** `claude setup-token` tokens last a year. Largely solved by the panel's token replacement; a countdown from a stored issue date would still warn before the device simply stops
 - **Sleep or dim on a schedule.** A lit 320x240 panel on a nightstand at 2am is a lot
+- **Respond to ambient light.** The CoreS3 carries an LTR-553 light and proximity
+  sensor on its front panel, and M5Unified may already expose it. Auto-brightness
+  would answer the schedule item above and the "dimmest dot is still too dim /
+  too bright" tuning at once. Fancy, so it belongs to a polish pass, and it is
+  unverified whether the Stack-Chan shell leaves the sensor uncovered
 - **Poll less when idle.** Utilization that hasn't moved in an hour doesn't need a 2-minute poll, and every poll spends the budget it reports on
 
 ### 2026-09-05 — Data surface inventoried

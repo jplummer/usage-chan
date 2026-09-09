@@ -753,7 +753,7 @@ you cannot see which tap you are on, and more steps make that worse. The row now
 shows five dots with the live one filled, and a tap on a dot applies it at once,
 so the choice is made by looking at the screen rather than by counting.
 
-Five levels at 16, 40, 96, 170 and 255, roughly even in perceived brightness.
+Five levels at 32, 64, 110, 175 and 255, roughly even in perceived brightness.
 None is off. The scale lives under its own NVS key, `bright5`, because the old
 0–3 scale where 0 meant off is a different schema and an old value says nothing
 about this one; anything out of range falls back to the middle dot, the same
