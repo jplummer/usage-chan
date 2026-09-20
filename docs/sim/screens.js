@@ -466,15 +466,17 @@
   // frames by tools/icons2c.py. Every fixed picture in the control column is
   // one of these; only the things driven by a live value -- the countdown
   // wedge, the spinner -- are still drawn by hand.
-  function drawIcon(g, x, y, rows, col) {
-    if (!rows) return;
-    for (let py = 0; py < 32; py++) {
-      const r = rows[py];
-      if (!r) continue;
-      for (let px = 0; px < 32; px++)
-        if (r & (1 << (31 - px))) g.drawPixel(x + px, y + py, col);
-    }
+  function drawIconScaled(g, x, y, ic, col, s) {
+    if (!ic) return;
+    for (let py = 0; py < ic.h; py++)
+      for (let px = 0; px < ic.w; px++) {
+        const w = ic.bits[py * ic.stride + (px >> 5)];
+        if (!(w & (1 << (31 - (px & 31))))) continue;
+        if (s === 1) g.drawPixel(x + px, y + py, col);
+        else         g.fillRect(x + px * s, y + py * s, s, s, col);
+      }
   }
+  function drawIcon(g, x, y, ic, col) { drawIconScaled(g, x, y, ic, col, 1); }
 
   // RSSI is a proxy for "will fetches work", and a coarse one -- see the open
   // note in design-decisions.md. A non-negative reading means no link: a
@@ -530,6 +532,45 @@
            y >= V_MENU_HIT_T && y < V_MENU_HIT_B;
   }
 
+  // ── The smoke overlay ───────────────────────────────────
+  // "The overlay scales with how much of the screen it invalidates." A single
+  // failed fetch invalidates nothing -- the numbers are as true as they were a
+  // second before. What earns an overlay is a condition that cannot get better
+  // on its own: the radio is down, so the next fetch cannot possibly succeed,
+  // or three attempts in a row failed with the radio up, which is the far end.
+  //
+  // It veils rather than hides. The numbers behind it are still true, just
+  // ageing, and covering them would claim we know less than we do.
+  const SMOKE_ALPHA = 150, SMOKE_LZ_W = 224, SMOKE_LZ_H = 118, SMOKE_ICON_S = 2;
+
+  function drawSmoke(g, T, kind, ageTxt) {
+    if (!kind) return;
+    const alpha = window.SCREENS && window.SCREENS.SMOKE_ALPHA_OVERRIDE !== undefined
+                ? window.SCREENS.SMOKE_ALPHA_OVERRIDE : SMOKE_ALPHA;
+    g.fillRectAlpha(0, 0, 320, 240, alpha, T.bg);
+
+    const x = (320 - SMOKE_LZ_W) / 2, y = (240 - SMOKE_LZ_H) / 2;
+    g.fillRoundRect(x, y, SMOKE_LZ_W, SMOKE_LZ_H, 14, T.card);
+    g.drawRoundRect(x, y, SMOKE_LZ_W, SMOKE_LZ_H, 14, T.dim);
+
+    // Placeholders, and they say so by being the small icons doubled.
+    const I = window.ICONS || {};
+    const ic = kind === 'wifi' ? I['wifi-out'] : I['refresh-fail'];
+    const iw = ic ? ic.w * SMOKE_ICON_S : 0, ih = ic ? ic.h * SMOKE_ICON_S : 0;
+    drawIconScaled(g, x + (SMOKE_LZ_W - iw) / 2, y + 10, ic, T.dim, SMOKE_ICON_S);
+
+    g.setFont('FreeSansBold12pt7b');
+    g.setTextDatum(TC);
+    g.setTextColor(T.text, T.card);
+    g.drawString(kind === 'wifi' ? 'no network' : 'API not answering', 160, y + 12 + ih);
+
+    if (ageTxt) {
+      g.setFont(T.small);
+      g.setTextColor(T.dim, T.card);
+      g.drawString('readings ' + ageTxt + ' old', 160, y + 36 + ih);
+    }
+  }
+
   // s: {ok, h5, e5, d7, e7, reset5, reset7, sevenBinds, ageTxt, err, fetching,
   //     overage: {active, status, resetTxt, disabledReason} | undefined}
   function dashboard(g, T, s) {
@@ -554,6 +595,10 @@
                          s.pollFrac === undefined ? 1 : s.pollFrac,
                          s.spinPhase || 0, !!s.refreshFailed,
                          s.spinner || 'dots', !!s.refreshFailing);
+
+    // Last, over everything including the control column: what it says is true
+    // of the whole screen. The menu button keeps working through it.
+    drawSmoke(g, T, s.smoke, s.ageTxt);
   }
 
   // Factored out of dashboard() so the exploratory sim pages (dashboard-
@@ -768,6 +813,6 @@
                      drawMarkX, captionY, drawToken, outlinedGlyph, V,
                      ctrlDisc, ctrlRing, ctrlWedge, ctrlSpokes,
                      drawRefreshIndicator, menuButtonHit,
-                     drawIcon, wifiIcon, wifiLevel, ctrlDots,
+                     drawIcon, drawIconScaled, wifiIcon, wifiLevel, ctrlDots, drawSmoke,
                      drawWindowBar, drawSevenDayBar, drawStatusLine };
 })();

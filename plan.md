@@ -6,19 +6,13 @@
 
 ## Where this is now
 
-**2026-09-20.** The device has been running live since 2026-09-04 and the numbers are trustworthy. The work since has been the display, and it has moved a long way.
+**2026-09-20.** Running live since 2026-09-04, numbers trustworthy. Everything since has been the display.
 
-The dashboard is **vertical**: two bottom-anchored columns, a thin one for the 7-day window and a wide one for the 5-hour, with fill meaning *what is left* and the bottom edge meaning exhaustion. A diamond marks where an even burn would have you, and a word beside it names the gap — `well ahead` through `well behind`. `docs/sim/` is the spec for all of it: `screens.js` is a line-for-line port of `src/ui.cpp`, so a disagreement between them is a finding rather than a nuisance.
+The dashboard is vertical: two bottom-anchored columns, fill meaning *what is left*, bottom edge meaning exhaustion, a diamond at even-burn pace and a word naming the gap. Extra usage draws as a vessel with a `$` or red `X` straddling the bar's end. The control column carries menu bars, a four-state signal glyph and a refresh indicator that counts down, spins, marks a failure for five seconds and then stays warn-coloured until something works. Two conditions that cannot fix themselves — radio down, or three API failures — veil the screen and put a lozenge on it. PIN entry is a keypad: four taps, not thirty-six.
 
-**Extra usage now shows.** An inner-stroked vessel holds whatever the overage allowance has left, a `$` or a red `X` token straddles the bar's end edge, and the big caption carries the state word. The blocked case is buildable today. The paying case is not fully — it needs numbers whose behaviour past the wall nobody has captured.
+`docs/sim/` is the spec. `screens.js` is a line-for-line port of `src/ui.cpp`, so a disagreement is a finding. Icons come from `design/icons/*.png` via `tools/fetch-icons.sh`, which pulls from Figma and regenerates both sides from one set of bits; `tools/verify-icons.js` holds it at zero differing pixels. Type in Figma is the device's own glyphs, via `tools/fonts2ttf.py`.
 
-**Figma now tells the truth about type.** `tools/fonts2ttf.py` generates 12 TTFs from the device's own glyph bitmaps, em-normalised so one size in Figma works for every face. Layouts are drawn at 1x, where a coordinate is a device pixel.
-
-Three things landed on 2026-09-20 that change what happens next. The overage headers arrive on *ordinary* responses, so "in overage" is `unified-status: rejected`, not the presence of a header — that bug is fixed. The first header set seen past the wall now pins itself to NVS and prints at every boot, so the capture no longer needs a console attached at the moment it happens. And a live header set says `overage-reset` is **2026-10-01 00:00 UTC** — the first of the month. The extra-usage allowance is a monthly billing window sharing no edge with either window the dashboard draws, which means the diamond is in the wrong place on the overage bar.
-
-The control column is real. Menu bars at the top, a four-state signal glyph in the middle, and a refresh indicator at the bottom that counts down to the next attempt, spins while one is running, and shows a struck-out circle for five seconds after one fails. The top glyph is the dashboard's only touch target. The PIN screen is a keypad now: four taps instead of up to 36, which matters because every flash is a reboot and every reboot is a PIN. A failed refresh attempt marks the circle for five seconds and leaves the countdown warn-coloured until something succeeds. Two treatments are still undecided — spinner bars or dots, ghosted or absent signal bands — and both are in `explore.html` section 7.
-
-The pictures now come from `design/icons/*.png` rather than from geometry fitted by hand. `tools/fetch-icons.sh` pulls them from Figma and regenerates everything in one command, given a Figma token in the environment.
+Open on the display: spinner bars or dots, ghosted or absent signal bands, both in `explore.html` section 7; the smoke icons are placeholders (the 32px ones doubled). Open on the data: the overage allowance resets monthly, 2026-10-01 00:00 UTC, sharing no edge with either window the dashboard draws — so the pace diamond is in the wrong place on the overage bar. Whether that allowance has a ceiling is still unmeasured, and the NVS capture that would answer it waits for the next time this account crosses the wall.
 
 Nothing is blocked. The next few moves are small and listed below.
 
@@ -28,6 +22,8 @@ Nothing is blocked. The next few moves are small and listed below.
 
 ### Next up
 
+- [ ] **Draw the smoke icons.** Placeholders are the 32px `wifi-out` and `refresh-fail` doubled — right meaning, wrong resolution. `icons2c.py` takes any frame size now, so an 80x80 frame (72x72 box) drops straight in.
+- [ ] **Move the signal glyph to the menu.** Its job on the dashboard was the alarm, and the refresh indicator took that over. Decide what takes the middle circle — service status and the parked week strip are both looking for a home.
 - [ ] **Tune the control column.** The glyphs are on the device and the colour is one constant, `C_CTRL`. Decide bars or dots, ghosted or absent, and how far down `C_CTRL` should go.
 - [ ] **Decide what colour a failure is.** The countdown after a failure is warn-coloured now, but the mark and the spinner still draw in `C_CTRL` — so the announcement is quieter than the condition it announces. One constant either way.
 - [ ] **Confirm the `[CAP]` line with your own eyes.** The dump fix is flashed and the device is running it, but the block prints in the first two seconds of boot and nothing remote can read that window (see the settled entry below). `pio device monitor -e stackchan`, then press reset.
@@ -202,6 +198,15 @@ The key is the interesting one: a legend for a display that deliberately has no 
 ## Settled
 
 Decisions as they were made, newest first, so the reasoning survives the session. Display decisions live in `docs/design-decisions.md`; this log is the project-level ones.
+
+### 2026-09-20 — Smoke, for the two conditions that cannot fix themselves
+The rule is the one already written in the display sketch: the overlay scales with how much of the screen it invalidates. A single failed fetch invalidates nothing — the numbers are as true as they were a second before, and a five-minute-old reading is what the screen shows for most of every interval. What earns an overlay is a condition that cannot get better on its own: the radio down, so the next fetch cannot possibly succeed, or three failures in a row with the radio up, which is the far end rather than one bad request.
+
+It veils rather than hides — `fillRectAlpha` over the whole screen, then a lozenge with an icon, a caption and the age. The numbers behind it are still true, just ageing, and covering them would claim we know less than we do. The menu still opens through it, which is informative now and useful once the menu can fix anything.
+
+The radio gets ten seconds' grace before it counts, because ESP32 links drop and come back on their own and a screen that veils itself for four seconds is worse than one that waits.
+
+The veil is one `fillRectAlpha` call because every frame is composed into a sprite and pushed once — a decision made on day one for an entirely unrelated reason.
 
 ### 2026-09-20 — A real PIN keypad
 Ten targets instead of one. Up to 36 taps became four. The old screen dialled each digit with BtnA/BtnB, which was fine when the device booted once and is not fine when every flash is a reboot and every reboot is a PIN. Parked since 2026-09-04; unparked because the cost finally landed on the person building it.

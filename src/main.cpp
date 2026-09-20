@@ -284,9 +284,32 @@ void loop() {
         // work, then gives way to that countdown.
         const bool failing = fetcherLastError()[0] != '\0' && lastTry != 0;
         const bool failed  = failing && millis() - lastTry < UI_FAIL_HOLD_MS;
+
+        // Smoke, for the two conditions that cannot get better on their own.
+        // The radio gets a few seconds' grace first: ESP32 links drop and come
+        // back on their own, and a screen that veils itself for four seconds
+        // is worse than one that waits to be sure.
+        static unsigned long s_linkLostMs = 0;
+        const bool linked = WiFi.isConnected();
+        if (linked) s_linkLostMs = 0;
+        else if (!s_linkLostMs) s_linkLostMs = millis();
+
+        int smoke = SMOKE_NONE;
+        if (!linked && millis() - s_linkLostMs >= SMOKE_WIFI_GRACE_MS) smoke = SMOKE_NO_WIFI;
+        else if (linked && fetcherFailStreak() >= SMOKE_API_FAILS)     smoke = SMOKE_NO_API;
+
+        char age[16] = {0};
+        const int32_t ageSec = fetcherAgeSec();
+        if (ageSec >= 0) {
+            if (ageSec < 90)        snprintf(age, sizeof(age), "%ds", (int)ageSec);
+            else if (ageSec < 5400) snprintf(age, sizeof(age), "%dm", (int)(ageSec / 60));
+            else                    snprintf(age, sizeof(age), "%dh", (int)(ageSec / 3600));
+        }
+
         uiDashboard(g_usage, lastTry,
-                    WiFi.isConnected() ? WiFi.RSSI() : 0, halBatPercent(),
-                    fetcherBusy(), g_settings.pollSec, failed, failing);
+                    linked ? WiFi.RSSI() : 0, halBatPercent(),
+                    fetcherBusy(), g_settings.pollSec, failed, failing,
+                    smoke, age);
         lastRedraw = millis();
     }
 

@@ -29,6 +29,7 @@ static SemaphoreHandle_t s_mutex = nullptr;
 static UsageData     s_usage{};
 static unsigned long s_lastGoodMs = 0;
 static unsigned long s_lastAttemptMs = 0;
+static uint8_t       s_failStreak   = 0;
 static uint32_t      s_lastDurMs  = 0;
 static char          s_lastError[64] = {0};
 
@@ -65,10 +66,12 @@ static void fetchTask(void*) {
             s_usage      = local;
             s_lastGoodMs = millis();
             s_lastError[0] = '\0';
+            s_failStreak = 0;
         } else {
             // Keep whatever was there. The values stay true; only their age
             // changes, and fetcherAgeSec() is what tells the screen about that.
             strlcpy(s_lastError, local.error, sizeof(s_lastError));
+            if (s_failStreak < 255) s_failStreak++;
         }
         s_lastDurMs = dur;
         xSemaphoreGive(s_mutex);
@@ -102,6 +105,8 @@ int32_t fetcherAgeSec() {
 const char* fetcherLastError() { return s_lastError; }
 
 unsigned long fetcherLastAttemptMs() { return s_lastAttemptMs; }
+
+uint8_t fetcherFailStreak() { return s_failStreak; }
 
 void fetcherSnapshot(UsageData& out, unsigned long& lastGoodMsOut) {
     if (!s_mutex) { out = s_usage; lastGoodMsOut = s_lastGoodMs; return; }

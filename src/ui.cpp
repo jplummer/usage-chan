@@ -497,13 +497,18 @@ static void ctrlSpokes(int y, int gap, uint16_t col) {
 //
 // A pixel at a time, because M5Canvas's mono-bitmap paths want their own
 // buffer format and this is 1024 bit tests at a redraw rate measured in hertz.
-static void drawIcon(int x, int y, const uint32_t* rows, uint16_t col) {
-    for (int py = 0; py < ICON_H; py++) {
-        const uint32_t r = rows[py];
-        if (!r) continue;
-        for (int px = 0; px < ICON_W; px++)
-            if (r & (1u << (31 - px))) g->drawPixel(x + px, y + py, col);
-    }
+static void drawIconScaled(int x, int y, const Icon& ic, uint16_t col, int s) {
+    for (int py = 0; py < ic.h; py++)
+        for (int px = 0; px < ic.w; px++) {
+            const uint32_t w = ic.bits[py * ic.stride + (px >> 5)];
+            if (!(w & (1u << (31 - (px & 31))))) continue;
+            if (s == 1) g->drawPixel(x + px, y + py, col);
+            else        g->fillRect(x + px * s, y + py * s, s, s, col);
+        }
+}
+
+static void drawIcon(int x, int y, const Icon& ic, uint16_t col) {
+    drawIconScaled(x, y, ic, col, 1);
 }
 
 // RSSI is a proxy for "will fetches work", and a coarse one -- see the open
@@ -524,7 +529,7 @@ static int wifiLevel(int rssi) {
 // explore.html section 7 puts them side by side.
 static constexpr bool V_WIFI_GHOST = true;
 
-static const uint32_t* wifiIcon(int rssi) {
+static const Icon& wifiIcon(int rssi) {
     switch (wifiLevel(rssi)) {
         case 3:  return ICON_WIFI_HI;
         case 2:  return V_WIFI_GHOST ? ICON_WIFI_MED : ICON_WIFI_MED_ALT;
@@ -997,9 +1002,59 @@ static void drawSpinner(int x, int y) {
     phase++;
 }
 
+// ── The smoke overlay ─────────────────────────────────────
+// "The overlay scales with how much of the screen it invalidates." That line
+// is from the display sketch and it is the whole rule. A single failed fetch
+// invalidates nothing -- the numbers are exactly as true as they were a second
+// before, and a five-minute-old reading is what this screen shows for most of
+// every interval anyway. What earns an overlay is a condition that cannot get
+// better on its own: the radio is down, so the next fetch cannot possibly
+// succeed, or three attempts in a row have failed with the radio up, which is
+// the far end rather than one bad request.
+//
+// It veils rather than hides. The numbers behind it are still true, just
+// ageing, and covering them would claim we know less than we do. fillRectAlpha
+// does the blend in one call -- a payoff from composing into a sprite, which
+// was decided for an unrelated reason on the first day.
+static constexpr int SMOKE_ALPHA = 150;   // of 255, over C_BG
+static constexpr int SMOKE_LZ_W  = 224, SMOKE_LZ_H = 118;
+static constexpr int SMOKE_ICON_S = 2;    // placeholder: the 32px icon, doubled
+
+static void drawSmoke(int kind, const char* ageTxt) {
+    if (kind == SMOKE_NONE) return;
+    g->fillRectAlpha(0, 0, SCREEN_W, SCREEN_H, SMOKE_ALPHA, C_BG);
+
+    const int x = (SCREEN_W - SMOKE_LZ_W) / 2, y = (SCREEN_H - SMOKE_LZ_H) / 2;
+    g->fillRoundRect(x, y, SMOKE_LZ_W, SMOKE_LZ_H, 14, C_CARD);
+    g->drawRoundRect(x, y, SMOKE_LZ_W, SMOKE_LZ_H, 14, C_DIM);
+
+    // Placeholders, and they say so by being the small icons doubled: the
+    // no-network one is the strike-through glyph the control column already
+    // draws, and the API one is the failed-refresh mark. Both mean the right
+    // thing at the wrong resolution. Drawing them at 64 wants 80x80 frames,
+    // which icons2c.py will take whenever they exist.
+    const Icon& ic = (kind == SMOKE_NO_WIFI) ? ICON_WIFI_OUT : ICON_REFRESH_FAIL;
+    const int iw = ic.w * SMOKE_ICON_S, ih = ic.h * SMOKE_ICON_S;
+    drawIconScaled(x + (SMOKE_LZ_W - iw) / 2, y + 10, ic, C_DIM, SMOKE_ICON_S);
+
+    g->setFont(&fonts::FreeSansBold12pt7b);
+    g->setTextDatum(top_center);
+    g->setTextColor(C_TEXT, C_CARD);
+    g->drawString(kind == SMOKE_NO_WIFI ? "no network" : "API not answering",
+                  SCREEN_W / 2, y + 12 + ih);
+
+    if (ageTxt && ageTxt[0]) {
+        char line[32];
+        snprintf(line, sizeof(line), "readings %s old", ageTxt);
+        g->setFont(&fonts::Font2);
+        g->setTextColor(C_DIM, C_CARD);
+        g->drawString(line, SCREEN_W / 2, y + 36 + ih);
+    }
+}
+
 void uiDashboard(const UsageData& data, unsigned long lastAttemptMs, int rssi,
                  int batPct, bool fetching, int pollSec, bool refreshFailed,
-                 bool refreshFailing) {
+                 bool refreshFailing, int smoke, const char* ageTxt) {
     g->fillScreen(C_BG);
 
     // Vertical layout, 2026-09-19 — two columns side by side instead of two
@@ -1032,6 +1087,11 @@ void uiDashboard(const UsageData& data, unsigned long lastAttemptMs, int rssi,
     drawRefreshIndicator(V_CIRCLE_Y[2], fetching, frac, refreshFailed,
                          refreshFailing);
 
+    // Last, over everything, including the control column: what it says is
+    // true of the whole screen. The menu button keeps working through it --
+    // the overlay is not modal, and the menu is where the cause and any fix
+    // will live.
+    drawSmoke(smoke, ageTxt);
     flush();
 }
 

@@ -65,6 +65,27 @@
         for (let xx = x0; xx < x1; xx++) this.px[yy * this.w + xx] = q;
     }
     fillScreen(c) { this.fillRect(0, 0, this.w, this.h, c); }
+
+    // LGFXBase::fillRectAlpha -> Panel::writeFillRectAlphaPreclipped ->
+    // effect_fill_alpha, verbatim. The destination channels are the QUANTIZED
+    // ones, because the sprite is 16bpp and R8()/G8()/B8() expand back out of
+    // 565 -- so blending has to happen after quant(), not before.
+    fillRectAlpha(x, y, w, h, alpha, c) {
+      const q = quant(c);
+      const inv = 256 - alpha;
+      const r8a = ((q >> 16) & 0xff) * (1 + alpha);
+      const g8a = ((q >> 8) & 0xff) * (1 + alpha);
+      const b8a = (q & 0xff) * (1 + alpha);
+      const x0 = Math.max(0, x), y0 = Math.max(0, y);
+      const x1 = Math.min(this.w, x + w), y1 = Math.min(this.h, y + h);
+      for (let yy = y0; yy < y1; yy++)
+        for (let xx = x0; xx < x1; xx++) {
+          const i = yy * this.w + xx, d = this.px[i];
+          this.px[i] = ((((r8a + ((d >> 16) & 0xff) * inv) >> 8) << 16)
+                      | (((g8a + ((d >> 8) & 0xff) * inv) >> 8) << 8)
+                      | ((b8a + (d & 0xff) * inv) >> 8));
+        }
+    }
     drawFastHLine(x, y, w, c) { this.fillRect(x, y, w, 1, c); }
     drawFastVLine(x, y, h, c) { this.fillRect(x, y, 1, h, c); }
 

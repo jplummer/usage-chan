@@ -569,6 +569,20 @@ The parameters bought nothing. Nobody is going to want a 43%-thick wifi wave at 
 
 **The workflow this buys.** Edit the frame, export it, run the tool, build. Nothing to fit, nothing to argue about, and the simulator and the device read identical bytes rather than two ports of the same intent. The one sharp edge is getting the PNG out of Figma: base64 through a chat window arrived corrupt twice — the file was the right length and one byte inside was wrong, which a zlib checksum caught and a length check did not. Download the asset URL with `curl` instead.
 
+## Smoke — the overlay for what cannot fix itself
+
+**2026-09-20.** The rule was already written, in the display sketch: *the overlay scales with how much of the screen it invalidates.* That sentence also says when not to use one.
+
+A single failed fetch invalidates nothing. The numbers are exactly as true as they were a second before, and a five-minute-old reading is what this screen shows for most of every interval anyway. The second failure invalidates nothing either. What earns an overlay is a condition that **cannot get better on its own**: the radio is down, so the next fetch cannot possibly succeed, or three attempts in a row have failed with the radio up, which is the far end rather than one bad request. Two flavours, one overlay, because the damage is identical even though the cause and the fix are not — so the cause goes in the caption rather than in a second visual language.
+
+**It veils rather than hides.** `fillRectAlpha` over the whole screen at 150 of 255, then a 224x118 lozenge with an icon, a caption and the age. The numbers behind it are still true, just ageing; covering them would claim we know less than we do. The lozenge covers most of the screen and none of the control column, which is deliberate — the menu still opens through the smoke. That is merely informative today and useful the moment the menu can fix anything.
+
+**The radio gets ten seconds' grace.** ESP32 links drop and come back on their own. A screen that veils itself for four seconds and then clears is worse than one that waits to be sure, and it teaches you to ignore it.
+
+The veil is one call because every frame is composed into an off-screen sprite and pushed once — decided on the first day so audio could own a task later, and paying off here instead.
+
+**The icons are placeholders and say so**, being the 32px `wifi-out` and `refresh-fail` doubled: the right meaning at the wrong resolution. `icons2c.py` reads any frame size now, so a larger frame drops in when one exists.
+
 ## The control column: three glyphs, and how loud they are
 
 **2026-09-20.** Menu, signal, refresh. The discs that stood in for them read as three lamps — the brightest thing on a screen whose job is a number and a bar. Drawing the real glyphs takes about five-sixths of that ink away on its own: a disc is 812 lit pixels, the menu bars are 144, a full-strength signal glyph is 319, the countdown ring at rest is 96.

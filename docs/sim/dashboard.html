@@ -40,6 +40,13 @@
       <label class="check"><input type="checkbox" id="wghost" checked> signal: ghost the unlit bands</label>
       <div class="ctl"><label for="rssi">signal <b id="rssiv">-55 dBm</b></label>
         <input type="range" id="rssi" min="-95" max="-30" value="-55"></div>
+      <div class="ctl"><label>smoke overlay</label>
+        <div class="seg" id="smoke">
+          <button data-v="" aria-pressed="true">none</button>
+          <button data-v="wifi">no network</button>
+          <button data-v="api">API down</button></div></div>
+      <div class="ctl"><label for="veil">veil <b id="veilv">150</b></label>
+        <input type="range" id="veil" min="0" max="255" value="150"></div>
       <div class="ctl"><label for="poll">through the poll interval <b id="pollv">62%</b></label>
         <input type="range" id="poll" min="0" max="100" value="62"></div>
       <div class="ctl"><label for="spin">spinner step <b id="spinv">0</b></label>
@@ -81,7 +88,11 @@
       refreshFailed: $('rfail').checked,
       refreshFailing: $('rfailing').checked,
       wifiGhost: $('wghost').checked,
-      rssi: +$('rssi').value,
+      // No network means no signal reading: the device passes 0 when the
+      // radio is down, so the column's glyph and the overlay cannot disagree.
+      rssi: $('smoke').querySelector('[aria-pressed="true"]').dataset.v === 'wifi'
+            ? 0 : +$('rssi').value,
+      smoke: $('smoke').querySelector('[aria-pressed="true"]').dataset.v,
       overage: $('ov').checked ? {
         active: true,
         status: $('ovstatus').querySelector('[aria-pressed="true"]').dataset.v,
@@ -93,11 +104,18 @@
     ['util', 'el', 'u7', 'e7', 'ovrem', 'poll'].forEach(k => $(k + 'v').textContent = $(k).value + '%');
     $('spinv').textContent = $('spin').value;
     $('rssiv').textContent = $('rssi').value + ' dBm';
+    $('veilv').textContent = $('veil').value;
+    SCREENS.SMOKE_ALPHA_OVERRIDE = +$('veil').value;
     SCREENS.dashboard(g, T, s);
     g.blit($('dash'), scale);
     $('cap').textContent = `${scale}× · 320×240 · ${(s.h5 / 100 - s.e5) > 0 ? 'ahead' : 'behind'} by ${Math.abs(Math.round((s.h5 / 100 - s.e5) * 288))}px`;
   }
   document.querySelectorAll('input').forEach(i => i.addEventListener('input', render));
+  $('smoke').addEventListener('click', ev => {
+    const b = ev.target.closest('button'); if (!b) return;
+    [...ev.currentTarget.children].forEach(x => x.setAttribute('aria-pressed', x === b));
+    render();
+  });
   $('ovstatus').addEventListener('click', ev => {
     const b = ev.target.closest('button'); if (!b) return;
     [...ev.currentTarget.children].forEach(x => x.setAttribute('aria-pressed', x === b));

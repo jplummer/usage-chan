@@ -46,6 +46,11 @@ int32_t fetcherAgeSec();
 // are real but stale.
 const char* fetcherLastError();
 
+// How many attempts in a row have failed, reset to zero by any success. Three
+// of these with the radio up is the evidence that the far end is down rather
+// than that one request went wrong -- see the smoke overlay in ui.cpp.
+uint8_t fetcherFailStreak();
+
 // millis() when the last attempt FINISHED, success or failure, or 0 if none
 // has. Distinct from fetcherSnapshot's lastGoodMs on purpose: freshness claims
 // key off success, but the retry schedule and the refresh indicator key off

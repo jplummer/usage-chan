@@ -36,12 +36,23 @@ void uiLockoutTick(int secondsLeft);
 // attempt, not success, because the ring counts down to the next try. pollSec
 // is the poll interval; pass 0 to leave the ring empty. refreshFailed shows
 // the fail mark in place of the ring.
+// The smoke overlay: a veil over the whole screen with a lozenge on top, for
+// the two conditions that mean the numbers behind it cannot get better on
+// their own. SMOKE_NO_WIFI is the radio being down, where the next fetch
+// cannot possibly succeed. SMOKE_NO_API is three failures in a row with the
+// radio up, which is the far end rather than one bad request.
+#define SMOKE_NONE     0
+#define SMOKE_NO_WIFI  1
+#define SMOKE_NO_API   2
+#define SMOKE_API_FAILS 3          // consecutive failures that earn the overlay
+#define SMOKE_WIFI_GRACE_MS 10000UL // a dropped link this brief is not news
+
 // refreshFailing means the last attempt errored and none has succeeded since;
 // the countdown to the retry takes the warning colour for as long as that is
 // true. refreshFailed is the transient mark in its first few seconds.
 void uiDashboard(const UsageData& data, unsigned long lastAttemptMs, int rssi,
                  int batPct, bool fetching, int pollSec, bool refreshFailed,
-                 bool refreshFailing);
+                 bool refreshFailing, int smoke, const char* ageTxt);
 
 // Whether a dashboard touch landed on the menu button. The zone is larger
 // than the circle it draws -- see V_MENU_HIT_* in ui.cpp.
