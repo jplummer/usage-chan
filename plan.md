@@ -204,7 +204,7 @@ The rule is the one already written in the display sketch: the overlay scales wi
 
 It veils rather than hides — `fillRectAlpha` over the whole screen, then a lozenge with an icon, a caption and the age. The numbers behind it are still true, just ageing, and covering them would claim we know less than we do. The menu still opens through it, which is informative now and useful once the menu can fix anything.
 
-The radio gets ten seconds' grace before it counts, because ESP32 links drop and come back on their own and a screen that veils itself for four seconds is worse than one that waits.
+The radio gets ten seconds' grace before it counts. ESP32 links drop and come back on their own, and a screen that veils itself for four seconds and then clears does not teach you to ignore that warning — it teaches you the device is unreliable, which is a debt paid back against everything else it says.
 
 The veil is one `fillRectAlpha` call because every frame is composed into a sprite and pushed once — a decision made on day one for an entirely unrelated reason.
 

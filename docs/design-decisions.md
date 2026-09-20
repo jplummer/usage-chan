@@ -577,7 +577,7 @@ A single failed fetch invalidates nothing. The numbers are exactly as true as th
 
 **It veils rather than hides.** `fillRectAlpha` over the whole screen at 150 of 255, then a 224x118 lozenge with an icon, a caption and the age. The numbers behind it are still true, just ageing; covering them would claim we know less than we do. The lozenge covers most of the screen and none of the control column, which is deliberate — the menu still opens through the smoke. That is merely informative today and useful the moment the menu can fix anything.
 
-**The radio gets ten seconds' grace.** ESP32 links drop and come back on their own. A screen that veils itself for four seconds and then clears is worse than one that waits to be sure, and it teaches you to ignore it.
+**The radio gets ten seconds' grace.** ESP32 links drop and come back on their own. A screen that veils itself for four seconds and then clears does not teach you to ignore that warning — it teaches you the device is unreliable. That is a debt paid back against everything else it says, including the things it gets right.
 
 The veil is one call because every frame is composed into an off-screen sprite and pushed once — decided on the first day so audio could own a task later, and paying off here instead.
 

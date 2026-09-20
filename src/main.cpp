@@ -286,9 +286,11 @@ void loop() {
         const bool failed  = failing && millis() - lastTry < UI_FAIL_HOLD_MS;
 
         // Smoke, for the two conditions that cannot get better on their own.
-        // The radio gets a few seconds' grace first: ESP32 links drop and come
+        // The radio gets a few seconds' grace first. ESP32 links drop and come
         // back on their own, and a screen that veils itself for four seconds
-        // is worse than one that waits to be sure.
+        // and then clears does not teach you to ignore that warning -- it
+        // teaches you the device is unreliable, which is a debt paid back
+        // against everything else it says.
         static unsigned long s_linkLostMs = 0;
         const bool linked = WiFi.isConnected();
         if (linked) s_linkLostMs = 0;
