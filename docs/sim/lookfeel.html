@@ -1,0 +1,216 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Usage-Chan sim · look and feel</title>
+<link rel="stylesheet" href="sim.css">
+<script src="fonts.js"></script>
+<script src="lgfx.js"></script>
+<script src="screens.js"></script>
+<script src="variants.js"></script>
+<style>
+  .grid canvas{width:100%;height:auto}
+  .swatches{display:flex;gap:10px;flex-wrap:wrap}
+  .sw{width:64px;height:40px;border-radius:5px;display:flex;align-items:flex-end;padding:4px;
+      font-family:var(--mono);font-size:9px;color:#fff;text-shadow:0 0 3px #000}
+  .spec canvas{width:100%;height:auto}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">usage-chan · simulator · look and feel</div>
+    <h1>One dialect for every screen</h1>
+    <p class="lede">The shipped screens are four dialects by accident. This page
+    lays candidates out side by side, drawn with the device's own glyphs, so the
+    choice is made by looking. The sliders drive every dashboard at once.</p>
+  </header>
+
+  <section class="stage">
+    <div>
+      <h2>Dashboard · one per small face</h2>
+      <div class="grid" id="dashgrid"></div>
+    </div>
+    <div class="controls">
+      <div class="ctl"><label for="util">5h utilization <b id="utilv"></b></label>
+        <input type="range" id="util" min="0" max="100" value="58"></div>
+      <div class="ctl"><label for="el">5h elapsed <b id="elv"></b></label>
+        <input type="range" id="el" min="0" max="100" value="44"></div>
+      <div class="ctl"><label for="u7">7d utilization <b id="u7v"></b></label>
+        <input type="range" id="u7" min="0" max="100" value="31"></div>
+      <div class="ctl"><label for="e7">7d elapsed <b id="e7v"></b></label>
+        <input type="range" id="e7" min="0" max="100" value="46"></div>
+      <div class="ctl"><label>Label case</label>
+        <div class="seg" id="case">
+          <button data-c="upper" aria-pressed="true">5-HOUR</button>
+          <button data-c="title">5-hour</button></div></div>
+      <div class="ctl"><label>Candidate face for the other screens</label>
+        <div class="seg" id="cand">
+          <button data-f="FreeSans9pt7b" aria-pressed="true">FreeSans 9</button>
+          <button data-f="DejaVu9">DejaVu 9</button>
+          <button data-f="DejaVu12">DejaVu 12</button>
+          <button data-f="FreeSans12pt7b">FreeSans 12</button></div></div>
+      <div class="ctl"><label>Headline face</label>
+        <div class="seg" id="head">
+          <button data-f="FreeSansBold24pt7b" aria-pressed="true">Bold 24</button>
+          <button data-f="FreeSans24pt7b">Regular 24</button>
+          <button data-f="FreeSansBold18pt7b">Bold 18</button></div></div>
+      <label class="check"><input type="checkbox" id="bind"> 7-day is the binding limit</label>
+      <label class="check"><input type="checkbox" id="stale"> last fetch failed</label>
+      <div class="ctl"><label>Menu row under finger</label>
+        <div class="seg" id="hl">
+          <button data-h="-1" aria-pressed="true">none</button>
+          <button data-h="0">0</button><button data-h="2">2</button></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Menu · three treatments · Font2 beside the candidate face</h2>
+    <div class="grid" id="menugrid"></div>
+  </section>
+
+  <section>
+    <h2>PIN entry · shipped vs keypad</h2>
+    <div class="grid" id="pingrid"></div>
+  </section>
+
+  <section>
+    <h2>Interstitials · boot, setup, connecting, lockout, error · Font2 then the candidate</h2>
+    <div class="grid" id="intgrid"></div>
+  </section>
+
+  <section>
+    <h2>Type specimen · the strings the device actually shows</h2>
+    <div class="grid spec" id="specgrid"></div>
+  </section>
+
+  <section>
+    <h2>Palette · as the panel quantises it</h2>
+    <div class="swatches" id="swatches"></div>
+  </section>
+
+  <section class="notes">
+    <h2>Reading this page</h2>
+    <dl>
+      <dt>the sim is the spec</dt>
+      <dd>These are the device's glyph bitmaps and LovyanGFX's own shape loops,
+      pixel-doubled. A face that looks right here looks right on the panel,
+      modulo backlight. The only things a hardware check adds are brightness
+      and viewing angle.</dd>
+      <dt>label case</dt>
+      <dd>UPPER labels are the shipped convention; Title case is the candidate.
+      Caps in a 16px face spend a lot of pixels shouting "5-HOUR" at a reader
+      who already knows.</dd>
+      <dt>the em dash finding</dt>
+      <dd>The status line read "14m old — can't refresh", and Font2 has no em
+      dash, so the device drew a space there. The sim showed it on its first
+      render; the firmware now uses a comma. Font2 and the Free fonts are
+      ASCII only, so punctuation stays inside ASCII.</dd>
+    </dl>
+  </section>
+</div>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const B = SCREENS.SHIPPED;
+  const SMALL = [['Font2', 'Font2 (shipped)'], ['FreeSans9pt7b', 'FreeSans 9'], ['DejaVu9', 'DejaVu 9'],
+                 ['DejaVu12', 'DejaVu 12'], ['FreeSans12pt7b', 'FreeSans 12']];
+  const CASE = { upper: x => x, title: x => x[0] + x.slice(1).toLowerCase() };
+  let headline = B.headline, highlight = -1, labelCase = 'upper', cand = 'FreeSans9pt7b';
+
+  function theme(small, label) { return Object.assign({}, B, { small, headline, label }); }
+
+  function cell(parent, title, note) {
+    const d = document.createElement('div'); d.className = 'cell';
+    const c = document.createElement('canvas');
+    d.innerHTML = `<h3>${title}</h3>`; d.appendChild(c);
+    if (note) { const p = document.createElement('p'); p.textContent = note; d.appendChild(p); }
+    parent.appendChild(c.parentNode); return c;
+  }
+
+  const dashCells = [], menuCells = [], pinCells = [], intCells = [], specCells = [];
+  for (const [f, fn] of SMALL) dashCells.push({ c: cell($('dashgrid'), fn), f });
+  const MENUS = [['pills (shipped)', SCREENS.menu], ['list', VARIANTS.menuList], ['list, accent marks live', VARIANTS.menuListAccent]];
+  for (const [mn, fn] of MENUS) for (const f of ['Font2', 'cand'])
+    menuCells.push({ c: cell($('menugrid'), mn), f, fn, t: mn });
+  for (const f of ['Font2', 'cand']) {
+    pinCells.push({ c: cell($('pingrid'), 'boxes + button strip (shipped)'), fn: SCREENS.pin, f });
+    pinCells.push({ c: cell($('pingrid'), 'keypad'), fn: VARIANTS.pinKeypad, f });
+  }
+  const INTS = [['boot', SCREENS.boot], ['setup', SCREENS.setup], ['connecting', SCREENS.connecting],
+                ['lockout', SCREENS.lockout], ['error', SCREENS.error]];
+  for (const f of ['Font2', 'cand']) for (const [n, fn] of INTS)
+    intCells.push({ c: cell($('intgrid'), n), f, fn });
+  for (const [f, fn] of SMALL) specCells.push({ c: cell($('specgrid'), fn), f });
+  const faceOf = f => f === 'cand' ? cand : f;
+  const nameOf = f => (SMALL.find(x => x[0] === faceOf(f)) || [0, faceOf(f)])[1];
+
+  const g = new LGFX();
+  function state() {
+    return {
+      ok: true, h5: +$('util').value, e5: $('el').value / 100,
+      d7: +$('u7').value, e7: $('e7').value / 100,
+      reset5: '3:40pm', reset7: 'Fri 1pm', sevenBinds: $('bind').checked,
+      ageTxt: $('stale').checked ? '14m' : '47s', err: $('stale').checked ? 'http_-1' : '',
+      fetching: false, brightness: 2, highlight, pos: 2, digits: [4, 7, 3, 0], pressed: '7',
+      percent: 80, bootLabel: 'Connecting WiFi...', attempt: 2, ssid: 'Plummer',
+    };
+  }
+  function specimen(g, T) {
+    g.fillScreen(T.bg);
+    const lines = [['5-HOUR 7-DAY Brightness Network', T.dim],
+                   ['a little ahead  well behind  on pace', T.text],
+                   ['resets 3:40pm  resets Fri 1pm  nearly out', T.dim],
+                   ['14m old, can\'t refresh (http_-1)', T.warn],
+                   ['tap outside to close  0123456789', T.text]];
+    g.setFont(T.small); g.setTextDatum(LGFX.TL);
+    const h = g.fontHeight(T.small) + 4;
+    lines.forEach(([t, col], i) => { g.setTextColor(col, T.bg); g.drawString(t, 16, 12 + i * h); });
+    g.setFont(T.headline); g.setTextDatum(LGFX.BR); g.setTextColor(T.text, T.bg);
+    g.drawString('62% left', 304, 190);
+    g.setTextColor(T.accent, T.bg); g.drawString('3:40pm', 304, 232);
+  }
+  function render() {
+    const s = state();
+    ['util', 'el', 'u7', 'e7'].forEach(k => $(k + 'v').textContent = $(k).value + '%');
+    const L = CASE[labelCase];
+    for (const d of dashCells) { SCREENS.dashboard(g, theme(d.f, L), s); g.blit(d.c, 2); }
+    const relabel = x => { x.c.previousSibling.textContent = `${x.c.previousSibling.textContent.split(' · ')[0]} · ${nameOf(x.f)}`; };
+    for (const m of menuCells) { m.fn(g, theme(faceOf(m.f)), s); g.blit(m.c, 2); relabel(m); }
+    for (const p of pinCells) { p.fn(g, theme(faceOf(p.f)), s); g.blit(p.c, 2); relabel(p); }
+    for (const p of intCells) { p.fn(g, theme(faceOf(p.f)), s); g.blit(p.c, 2); relabel(p); }
+    for (const p of specCells) { specimen(g, theme(p.f)); g.blit(p.c, 2); }
+  }
+  document.querySelectorAll('input').forEach(i => i.addEventListener('input', render));
+  $('head').addEventListener('click', ev => {
+    const b = ev.target.closest('button'); if (!b) return;
+    headline = b.dataset.f;
+    [...ev.currentTarget.children].forEach(x => x.setAttribute('aria-pressed', x === b));
+    render();
+  });
+  $('case').addEventListener('click', ev => {
+    const b = ev.target.closest('button'); if (!b) return;
+    labelCase = b.dataset.c;
+    [...ev.currentTarget.children].forEach(x => x.setAttribute('aria-pressed', x === b));
+    render();
+  });
+  $('cand').addEventListener('click', ev => {
+    const b = ev.target.closest('button'); if (!b) return;
+    cand = b.dataset.f;
+    [...ev.currentTarget.children].forEach(x => x.setAttribute('aria-pressed', x === b));
+    render();
+  });
+  $('hl').addEventListener('click', ev => {
+    const b = ev.target.closest('button'); if (!b) return;
+    highlight = +b.dataset.h;
+    [...ev.currentTarget.children].forEach(x => x.setAttribute('aria-pressed', x === b));
+    render();
+  });
+  // Palette swatches through the same 565 round trip the sim uses.
+  const sw = $('swatches');
+  for (const k of ['bg', 'card', 'text', 'dim', 'accent', 'ok', 'warn', 'crit']) {
+    const d = document.createElement('div'); d.className = 'sw';
+    d.style.background = '#' + B[k].toString(16).padStart(6, '0');
+    d.textContent = k; sw.appendChild(d);
+  }
+  render();
+})();
+</script>

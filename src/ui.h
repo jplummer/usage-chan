@@ -23,9 +23,14 @@ void uiPinScreen(int pos, const int digits[4]);
 void uiLockoutStatic(int attempts, int maxAttempts, int lockoutSec);
 void uiLockoutTick(int secondsLeft);
 
-// The main screen.
+// The main screen. pollSec is the poll interval, which the refresh ring needs
+// to know how far through the wait it is; pass 0 to leave the ring empty.
 void uiDashboard(const UsageData& data, unsigned long lastFetchMs, int rssi,
-                 int batPct, bool fetching);
+                 int batPct, bool fetching, int pollSec);
+
+// Whether a dashboard touch landed on the menu button. The zone is larger
+// than the circle it draws -- see V_MENU_HIT_* in ui.cpp.
+bool uiMenuButtonHit(int x, int y);
 
 void uiError(const char* title, const char* detail = nullptr);
 

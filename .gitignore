@@ -1,3 +1,6 @@
+# Generated: tools/fonts2ttf.py writes the Figma faces here
+build/
+
 # PlatformIO
 .pio/
 .pioenvs/
@@ -12,3 +15,7 @@ reference/
 
 # macOS
 .DS_Store
+
+# Python bytecode
+__pycache__/
+*.pyc

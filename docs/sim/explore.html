@@ -1,0 +1,401 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Usage-Chan sim · explore</title>
+<link rel="stylesheet" href="sim.css">
+<script src="fonts.js"></script>
+<script src="lgfx.js"></script>
+<script src="screens.js"></script>
+<script src="dashboard-variants.js"></script>
+<style>
+  .grid canvas{width:100%;height:auto}
+  .cell.shipped h3{color:var(--accent)}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">usage-chan · simulator · exploring, not decided</div>
+    <h1>Reset anchor &amp; overage</h1>
+    <p class="lede">Two open questions from a single evening of poking at it, not
+    a redesign: where the window's reset time lives, and what the screen does
+    once the account starts spending real money. Nothing on this page is
+    committed to <code>screens.js</code> or <code>src/ui.cpp</code> — it's
+    candidates in <code>dashboard-variants.js</code>, compared against the
+    shipped dashboard.</p>
+  </header>
+
+  <section class="stage">
+    <div>
+      <h2>1 · Reset time, anchored at the top bar</h2>
+      <p>Today the 5-hour block's reset time only ever shows up as the big
+      headline (once under 40% left) or the small footnote (above it) — never
+      in one fixed place. The 7-day bar already anchors it top-right on its
+      label row; these anchor the 5-hour block's label row the same way. The
+      catch: that slot is claimed by the big headline today, so anchoring it
+      for real costs about one small-text row of height per block, against the
+      "no title stripe" reclaim. Each treatment spends that cost differently —
+      see which one still feels worth it.</p>
+      <div class="grid" id="resetgrid"></div>
+    </div>
+    <div class="controls">
+      <div class="ctl"><label for="util">5h utilization <b id="utilv"></b></label>
+        <input type="range" id="util" min="0" max="100" value="34"></div>
+      <div class="ctl"><label for="el">5h elapsed <b id="elv"></b></label>
+        <input type="range" id="el" min="0" max="100" value="52"></div>
+      <div class="ctl"><label for="u7">7d utilization <b id="u7v"></b></label>
+        <input type="range" id="u7" min="0" max="100" value="31"></div>
+      <div class="ctl"><label for="e7">7d elapsed <b id="e7v"></b></label>
+        <input type="range" id="e7" min="0" max="100" value="46"></div>
+      <label class="check"><input type="checkbox" id="bind"> 7-day is the binding limit</label>
+      <label class="check"><input type="checkbox" id="stale"> last fetch failed</label>
+    </div>
+  </section>
+
+  <section class="stage">
+    <div>
+      <h2>2 · Getting into paid overage</h2>
+      <p>The device already reads <code>overage-status</code>,
+      <code>overage-utilization</code>, <code>overage-reset</code> and
+      <code>overage-disabled-reason</code> on every fetch and shows none of it
+      — see "Overage" in <code>docs/design-decisions.md</code>. Nobody has
+      captured what these look like mid-overage yet, so these lean on a status
+      word and an optional clock, never a dollar figure the header probe can't
+      give them. Mark literally builds the parked idea from that doc — a mark
+      past the bar's right edge, where the geometry already says <em>past here
+      it costs money</em>. Badge leaves the bar alone and states the fact
+      beside it. State treats overage as a different mode: pace stops meaning
+      anything once you're past the wall, so the diamond and the "behind/ahead"
+      caption drop out entirely.</p>
+      <div class="grid" id="overagegrid"></div>
+    </div>
+    <div class="controls">
+      <div class="ctl"><label>5h utilization <span id="ovutilv">100%</span></label>
+        <input type="range" id="ovutil" min="0" max="100" value="100"></div>
+      <div class="ctl"><label>5h elapsed <span id="ovelv">70%</span></label>
+        <input type="range" id="ovel" min="0" max="100" value="70"></div>
+      <label class="check"><input type="checkbox" id="ov-active" checked> in overage</label>
+      <div class="ctl"><label>overage-status</label>
+        <div class="seg" id="ov-status">
+          <button data-v="allowed" aria-pressed="true">allowed</button>
+          <button data-v="allowed_warning">warning</button>
+          <button data-v="rejected">rejected</button></div></div>
+      <label class="check"><input type="checkbox" id="ov-reset" checked> overage-reset known</label>
+      <div class="ctl"><label>overage-disabled-reason</label>
+        <div class="seg" id="ov-reason">
+          <button data-v="" aria-pressed="true">none</button>
+          <button data-v="monthly_cap">monthly_cap</button>
+          <button data-v="payment_failed">payment_failed</button></div></div>
+    </div>
+  </section>
+
+  <section class="stage">
+    <div>
+      <h2>3 · Seven-day pace diamond, off the straddle</h2>
+      <p>Shipped draws the diamond at a fixed size centred on the 7-day
+      track no matter how thin that track is — 8px of bar under a ~14px
+      mark reads as the diamond stabbing through the bar rather than sitting
+      on it. Proportional shrinks the diamond to the track's own scale, still
+      centred through it. Atop keeps the track at its shipped thickness — it
+      stays one clean, unbroken bar — and lifts the diamond off it entirely,
+      tip resting on the top edge, so it reads as a marker floating above the
+      timeline rather than a mark cut into it.</p>
+      <div class="grid" id="tickgrid"></div>
+    </div>
+    <div class="controls">
+      <p style="font-size:12.5px;color:var(--ink-dim);margin:0">Uses the
+      section 1 sliders — 7-day utilization and elapsed drive the diamond's
+      position here too.</p>
+    </div>
+  </section>
+
+  <section class="stage">
+    <div>
+      <h2>4 · The overage bar, vertical</h2>
+      <p>The bar's rule everywhere else is <em>fill is what's available</em> —
+      green grows from the bottom and shrinks as you spend. Shipped breaks that
+      rule the moment overage starts: it floods the track solid, which under
+      the same rule means <em>everything remains</em>, the exact opposite of
+      what overage means. The three alternates keep the rule and differ only
+      in what is genuinely left to draw. The track stops at 224 in every state
+      so the layout never twitches, and the token straddles the track's end
+      edge — the boundary you just crossed.</p>
+      <p>Only one of these can be built today. Blocked needs nothing but
+      <code>overage-status: rejected</code>, which is already on the wire.
+      Capped needs <code>overage-utilization</code> to be a real fraction of a
+      real ceiling, and needs the overage window to reset with the window it
+      belongs to so the diamond can be placed — neither has ever been observed.
+      Uncapped is the fallback for when it turns out there is no denominator:
+      nothing constrains you, so nothing is missing from the vessel, and pace
+      retires rather than assert something false about an unbounded budget.</p>
+      <div class="grid" id="vovergrid"></div>
+    </div>
+    <div class="controls">
+      <div class="ctl"><label>overage remaining <span id="ovremv">19%</span></label>
+        <input type="range" id="ovrem" min="0" max="100" value="19"></div>
+      <p style="font-size:12.5px;color:var(--ink-dim);margin:0">Drag it to zero
+      and watch the token cover the last of the fill — the two want the same
+      end of the bar, which is the cost of straddling the boundary.</p>
+    </div>
+  </section>
+
+  <section class="stage">
+    <div>
+      <h2>5 · What the big caption says</h2>
+      <p>Shipped swaps the headline for the reset time below 40% remaining.
+      That was the right call when the headline and the footnote were
+      neighbouring rows and only one of them could be prominent — the question
+      changes from <em>should I start this?</em> to <em>should I wait?</em>, so
+      the answer to the new question takes the big slot. In this layout the
+      reset time has a permanent home at the bottom, which is the whole reason
+      the bar stops at 224. The swap empties that home exactly when the clock
+      matters most. Drag remaining below 40 on the left cell and watch the
+      bottom row go blank.</p>
+      <p>The ladder keeps the principle and drops the mechanism. Every fact
+      stays in one place and emphasis escalates instead: the headline always
+      states the budget's own condition, the bottom row always answers when you
+      get more, and colour does the work the swap used to do.</p>
+      <p><strong>The unresolved part is the word below 12%.</strong>
+      <code>nearly out</code> is what shipped says and what
+      <code>design-decisions.md</code> blesses — a claim of proximity rather
+      than a fraction, which cannot be wrong by 2× the way <em>about a third
+      left</em> was. But it measures 116px against a 102px slot, so it does not
+      fit the headline as written. Keeping the number fits and stays precise,
+      but says nothing shipped does not already say. Pick one and it wants
+      writing back into the decision log.</p>
+      <div class="grid" id="ladgrid"></div>
+    </div>
+    <div class="controls">
+      <div class="ctl"><label>remaining <span id="ladremv">66%</span></label>
+        <input type="range" id="ladrem" min="0" max="100" value="66"></div>
+      <div class="ctl"><label>elapsed <span id="ladelv">52%</span></label>
+        <input type="range" id="ladel" min="0" max="100" value="52"></div>
+      <div class="ctl"><label>below 12%, the headline says</label>
+        <div class="seg" id="ladlow">
+          <button data-v="very low" aria-pressed="true">very low</button>
+          <button data-v="low">low</button>
+          <button data-v="number">8% left</button></div></div>
+      <p style="font-size:12.5px;color:var(--ink-dim);margin:0">100% left is
+      104px in a 102px slot, so the top of the range clips too — the circles
+      would need 4px more room, or that one string needs shortening.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="stage">
+      <h2>6 &middot; The refresh indicator</h2>
+      <p>The control column's third circle is the first one to mean anything.
+      Until now the poll interval was invisible: the screen changed when it
+      changed, and nothing said whether a number was four seconds old or four
+      minutes. The old <code>updated 47s ago</code> line said it in words and
+      cost a row, and it answered the wrong question &ndash; you don't want the
+      age of the last reading, you want to know when the next one lands.</p>
+      <p>So the circle is a clock that fills. It starts empty at the moment of
+      a fetch and closes clockwise from twelve as the interval runs down, which
+      means a full ring is a fetch about to happen and an empty one is a fetch
+      that just did. While the request is actually in flight the ring gives way
+      to a spinner &ndash; eight spokes with one dark gap moving round them. Two
+      states, one object, in one place.</p>
+      <p>There's a reason to make this visible beyond knowing the age of a
+      number. Every poll is a real API call that spends a sliver of the budget
+      the screen is reporting. A thing that spends something should be
+      something you can watch, and the same object is where a
+      <em>refresh&nbsp;now</em> tap will land once there's somewhere for it to
+      go &ndash; see <em>Refresh as a visible, tappable object</em> in
+      <code>plan.md</code>.</p>
+      <p>The zoom row is the part worth checking. All three circles in that
+      column are drawn by the same test &ndash; a pixel is in when its centre
+      falls inside a radius-16 circle &ndash; so a full ring is pixel-identical
+      to the discs above it. An earlier cut drew the discs with
+      <code>fillRoundRect</code> and the pie by hand, and the full ring came
+      out 32 pixels fatter than its neighbours. Nobody would have named it;
+      everyone would have seen it.</p>
+      <div class="grid" id="refzoom"></div>
+      <div class="grid" id="refgrid"></div>
+    </div>
+    <div class="controls">
+      <div class="ctl"><label>through the interval <span id="refposv">62%</span></label>
+        <input type="range" id="refpos" min="0" max="100" value="62"></div>
+      <p style="font-size:12.5px;color:var(--ink-dim);margin:0">The frame draws
+      the spinner's spokes in Figma's default grey, which isn't in the palette.
+      They're dim here, matching the ring in the frame beside it. If the
+      spinner should shout instead, it's one constant.</p>
+    </div>
+  </section>
+
+  <section class="notes">
+    <h2>Reading this page</h2>
+    <dl>
+      <dt>why the anchor treatments grow the block</dt>
+      <dd>The headline's big font already overshoots upward into the label
+      row's own vertical space — it only gets away with it because the label
+      sits far left and the headline far right of the same row. A third thing
+      in that row's right slot needs its own line, not a gap that happens to
+      be free.</dd>
+      <dt>why the overage treatments avoid dollar amounts</dt>
+      <dd>The header probe (what's actually wired up in <code>api.cpp</code>)
+      gives a status word and fractions, not currency. A dollar figure only
+      exists on the JSON usage endpoint, which is a separate, undecided
+      switch — see <code>docs/data-inventory.md</code>. Building the overage
+      display around a number the device doesn't have yet would be the same
+      mistake the old "about a third left" phrasing made, the other direction.</dd>
+      <dt>what none of this replaces</dt>
+      <dd>The real fix is still capturing what the five overage headers
+      actually do once an account crosses the wall — logged since 2026-09-08,
+      read never. These three are candidates for once that capture happens,
+      not a substitute for it.</dd>
+    </dl>
+  </section>
+</div>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const T = SCREENS.SHIPPED;
+  const g = new LGFX();
+
+  function cell(parent, title, fn) {
+    const d = document.createElement('div'); d.className = 'cell' + (title === 'shipped' ? ' shipped' : '');
+    const c = document.createElement('canvas');
+    d.innerHTML = `<h3>${title}</h3>`; d.appendChild(c);
+    parent.appendChild(d);
+    return { c, fn };
+  }
+
+  const RESET_TREATMENTS = [
+    ['shipped', SCREENS.dashboard],
+    ['both — anchor + swap', DASHVARIANTS.resetAnchorBoth],
+    ['only — anchor, no swap', DASHVARIANTS.resetAnchorOnly],
+    ['urgent — anchor, no footnote', DASHVARIANTS.resetAnchorUrgent],
+  ].map(([t, fn]) => cell($('resetgrid'), t, fn));
+
+  const TICK_TREATMENTS = [
+    ['shipped — straddling, bh=8 r=7', SCREENS.dashboard],
+    ['proportional — smaller diamond, bh=5 r=4', DASHVARIANTS.sevenDayProportional],
+    ['atop — diamond lifts off, bh=8 r=6', DASHVARIANTS.sevenDayAtop],
+  ].map(([t, fn]) => cell($('tickgrid'), t, fn));
+
+  const OVERAGE_TREATMENTS = [
+    ['shipped (blind to overage)', SCREENS.dashboard],
+    ['mark — past the right edge', DASHVARIANTS.overageMark],
+    ['badge — bar untouched', DASHVARIANTS.overageBadge],
+    ['state — pace retires', DASHVARIANTS.overageState],
+  ].map(([t, fn]) => cell($('overagegrid'), t, fn));
+
+  const VOVER_TREATMENTS = [
+    ['shipped — floods the track', SCREENS.dashboard],
+    ['capped — blue is what is left', DASHVARIANTS.vPayingCapped],
+    ['uncapped — nothing missing, pace retires', DASHVARIANTS.vPayingUncapped],
+    ['blocked — empty vessel, crit ring', DASHVARIANTS.vBlocked],
+  ].map(([t, fn]) => cell($('vovergrid'), t, fn));
+
+  // Zoomed crops of the refresh circle. The circle is 32px on a 320px screen,
+  // which at 2x is too small to judge; this lifts the 40x40 box around it out
+  // of a real dashboard render rather than drawing it standalone, so what you
+  // see is what the screen draws.
+  function refCell(parent, title, st) {
+    const d = document.createElement('div'); d.className = 'cell';
+    const c = document.createElement('canvas');
+    d.innerHTML = `<h3>${title}</h3>`; d.appendChild(c);
+    parent.appendChild(d);
+    return { c, st };
+  }
+  const V = SCREENS.V;
+  const REF_ZOOM = [
+    ['empty &middot; just fetched', { pollFrac: 0 }],
+    ['quarter', { pollFrac: 0.25 }],
+    ['half', { pollFrac: 0.5 }],
+    ['full &middot; about to fetch', { pollFrac: 1 }],
+    ['fetching', { fetching: true, spinPhase: 0 }],
+    ['fetching +1', { fetching: true, spinPhase: 1 }],
+    ['fetching +2', { fetching: true, spinPhase: 2 }],
+    ['fetching +3', { fetching: true, spinPhase: 3 }],
+  ].map(([t, st]) => refCell($('refzoom'), t, st));
+
+  const REF_FULL = [
+    ['counting down', { pollFrac: 0.62 }],
+    ['fetching', { fetching: true, spinPhase: 1 }],
+  ].map(([t, st]) => refCell($('refgrid'), t, st));
+
+  const LADDER = [
+    ['shipped — headline swaps to the clock', SCREENS.dashboard],
+    ['ladder — emphasis escalates in place', DASHVARIANTS.vLadder],
+  ].map(([t, fn]) => cell($('ladgrid'), t, fn));
+
+  function resetState() {
+    return {
+      ok: true, h5: +$('util').value, e5: $('el').value / 100,
+      d7: +$('u7').value, e7: $('e7').value / 100,
+      reset5: '3:40pm', reset7: 'Fri 1pm', sevenBinds: $('bind').checked,
+      ageTxt: $('stale').checked ? '14m' : '47s', err: $('stale').checked ? 'http_-1' : '',
+      fetching: false, phase: 1,
+    };
+  }
+
+  function overageState() {
+    const reason = $('ov-reason').querySelector('[aria-pressed="true"]').dataset.v;
+    return {
+      ok: true, h5: +$('ovutil').value, e5: $('ovel').value / 100, d7: 61, e7: 0.55,
+      reset5: '3:40pm', reset7: 'Fri 1pm', sevenBinds: false,
+      ageTxt: '47s', err: '', fetching: false, phase: 1,
+      overage: {
+        active: $('ov-active').checked,
+        status: $('ov-status').querySelector('[aria-pressed="true"]').dataset.v,
+        remaining: $('ovrem').value / 100,
+        resetTxt: $('ov-reset').checked ? '9:00pm' : null,
+        disabledReason: reason || null,
+      },
+    };
+  }
+
+  function render() {
+    ['util', 'el', 'u7', 'e7'].forEach(k => $(k + 'v').textContent = $(k).value + '%');
+    const rs = resetState();
+    for (const cell of RESET_TREATMENTS) { cell.fn(g, T, rs); g.blit(cell.c, 2); }
+    const os = overageState();
+    for (const cell of OVERAGE_TREATMENTS) { cell.fn(g, T, os); g.blit(cell.c, 2); }
+    ['ovutil', 'ovel'].forEach(k => $(k + 'v').textContent = $(k).value + '%');
+    ['ladrem', 'ladel'].forEach(k => $(k + 'v').textContent = $(k).value + '%');
+    const ls = {
+      ok: true, h5: 100 - $('ladrem').value, e5: $('ladel').value / 100,
+      d7: 31, e7: 0.46, reset5: '3:40pm', reset7: 'Fri 12:30pm',
+      sevenBinds: false, ageTxt: '47s', err: '', fetching: false,
+      lowWord: $('ladlow').querySelector('[aria-pressed="true"]').dataset.v,
+    };
+    for (const cell of LADDER) { cell.fn(g, T, ls); g.blit(cell.c, 2); }
+    $('ovremv').textContent = $('ovrem').value + '%';
+    const vs = os;   // overage.remaining is already on it
+    for (const cell of VOVER_TREATMENTS) {
+      const st = cell.fn === DASHVARIANTS.vBlocked
+        ? Object.assign({}, vs, { overage: Object.assign({}, vs.overage, { status: 'rejected' }) })
+        : vs;
+      cell.fn(g, T, st); g.blit(cell.c, 2);
+    }
+    for (const cell of TICK_TREATMENTS) { cell.fn(g, T, rs); g.blit(cell.c, 2); }
+
+    $('refposv').textContent = $('refpos').value + '%';
+    const refBase = Object.assign({}, rs, { pollFrac: $('refpos').value / 100 });
+    const crop = new LGFX(40, 40);
+    for (const cell of REF_ZOOM) {
+      SCREENS.dashboard(g, T, Object.assign({}, refBase, cell.st));
+      for (let y = 0; y < 40; y++)
+        for (let x = 0; x < 40; x++)
+          crop.px[y * 40 + x] = g.px[(V.V_CIRCLE_Y2 - 4 + y) * 320 + (V.V_CTRL_X - 4 + x)];
+      crop.blit(cell.c, 6);
+    }
+    for (const cell of REF_FULL) {
+      SCREENS.dashboard(g, T, Object.assign({}, refBase, cell.st,
+        cell.st.fetching ? {} : { pollFrac: $('refpos').value / 100 }));
+      g.blit(cell.c, 2);
+    }
+  }
+
+  document.querySelectorAll('input[type=range], input[type=checkbox]').forEach(i =>
+    i.addEventListener('input', render));
+  document.querySelectorAll('.seg').forEach(seg => seg.addEventListener('click', ev => {
+    const b = ev.target.closest('button'); if (!b) return;
+    [...seg.children].forEach(x => x.setAttribute('aria-pressed', x === b));
+    render();
+  }));
+
+  render();
+})();
+</script>

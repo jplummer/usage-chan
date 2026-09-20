@@ -136,7 +136,7 @@ Established practice worth copying from OpenUsage:
   reported freshness it did not have.
 - **Staleness is stated in words, not signalled by a colour.** A small element
   changing hue is too quiet a channel for "your numbers are old". The status line
-  says `14m old — can't refresh (http_-1)`: age first, because the numbers are
+  says `14m old, can't refresh (http_-1)`: age first, because the numbers are
   what the reader came for, then the reason.
 - **A missing field omits its row** rather than rendering zero.
 - **"No data" is not "0".** A confident zero is indistinguishable from "nothing
@@ -466,6 +466,74 @@ line does not, and every character spent on charm there is spent against
 glanceability. Phase 2's expression can be as warm as it likes precisely because
 the text under it reads plainly.
 
+## The simulator is the spec
+
+Decided 2026-09-08. `docs/sim/` draws the device's screens in a browser from the
+device's own glyph bitmaps and LovyanGFX's own shape loops, pixel-doubled.
+Earlier sketches approximated the panel in a web face, which made every
+typographic judgement a guess. Now a face that looks right in the sim looks
+right on the panel, and the only things a hardware check adds are backlight and
+viewing angle. `screens.js` is a port of `ui.cpp`; when one changes the other
+changes in the same commit, and a disagreement between them is a finding.
+
+The first render found one: the status line's em dash, which Font2 cannot draw,
+had been a blank on the device since it shipped.
+
+**PIN entry becomes a keypad.** Decided from the sim, 2026-09-08: ten targets in
+a 3×4 grid, four masked slots above, the fourth digit submits. Replaces the
+36-tap digit cycling and the labelled button strip that existed to serve it.
+
+## Figma was lying about type, and now it isn't
+
+The sim closed the gap between the browser and the panel. It did nothing about
+the gap between Figma and either one, and that is where the next typographic
+error came from.
+
+The vertical dashboard was drawn in Figma with a big headline beside the bars.
+On the device that headline gets 129px — what is left of 320 after two bars and
+the reserved control column. At the 24pt face the layout called for, "100% left"
+measures 205px, "near cap" 196px, and "blocked" 180px. Every realistic string
+overflowed, and because the control column is painted after the text, the
+overflow was not even visible as overflow — it was quietly erased. The thin
+column was worse in proportion: "a little behind" is 87px of text in a 48px
+slot, in the smallest face that exists. Nothing in Figma said any of this. The
+sim said all of it on the first render.
+
+So the fix is the same one, one tool upstream. `tools/fonts2ttf.py` builds a
+TrueType file per face out of the same glyph data the sim draws from — exact
+outlines, exact advance widths — and Figma can then set type the panel will
+actually honour. Every face uses an em of 100 device pixels, so one size works
+for all of them: 100 at device scale, 200 on a 2x canvas, and no other number
+to type. The digit in the family name is the source face's point label, kept so
+it matches what `ui.cpp` asks for — not a size, and not a pixel height. Font2 gets covered too,
+which matters, because Font2 is where most of the text on this device lives and
+there has never been a TTF of it anywhere.
+
+Checked rather than assumed: test strings rasterise pixel for pixel identical
+to LovyanGFX's own output, and widths match the sim exactly on Font2 across 428
+strings. Font2 carries nearly every string this device draws, so in practice
+the two agree.
+
+Three narrow places where they don't, all of them LovyanGFX behaviours a font
+file cannot carry. A string whose first glyph reaches left of the pen gets
+nudged 1px right by the device, and measured 1px wider, so it sits 1px further
+along on the panel than in Figma — that is `_` in the FreeSans faces, `W`, `v`
+and `y` in DejaVu 9, `J`, `V`, `v` and `y` in DejaVu 12, and `J` in DejaVu 18.
+A string's reported width also includes the last glyph's ink where it overhangs
+its own advance, which an advance-based TTF width does not. And where a glyph's
+ink is wider than its advance, the next glyph's background fill erases the
+overlap on the panel, so the device shows slightly less of it than Figma will.
+
+None of those glyphs starts a string in the shipped UI, Font2 has none of them
+at all, and the worst case anywhere is 2px. Leave 2px of slack, and check the
+sim for anything that close to its budget.
+
+Two things this does not fix. The Figma file is drawn at 2x, so every budget
+still needs halving before it means anything — an easy way to believe there is
+twice the room there is. And accurate type does not create room. 129px is a
+geometry decision, not a font-size decision; if the headline should be big,
+something else in the layout has to move.
+
 ## The PIN — reconsidered
 
 **First assessment was too narrow, and wrong in its conclusion.**
@@ -789,6 +857,160 @@ display gets designed from the answer. The parked currency-symbol idea — a
 symbol past the right edge of the bar, where the geography already says *past
 here it costs money* — is the likely shape, with a headline that says you are
 paying rather than that you are out.
+
+## The overage display rested on three assumptions; one is now measured
+
+**Decided 2026-09-20, flagged rather than resolved, and then partly
+measured the same day** — see the amendments inline. The vertical
+dashboard now draws overage as a vessel: an inner-stroked track holding
+whatever the extra-usage allowance has left, with the pace diamond and its
+word intact because there is a fill edge to read them against. That is the
+right shape *if* the data behaves the way we are assuming. Nobody has ever
+captured a real overage header set — not us, and as far as a search can tell,
+not anyone. Another implementation carries an open issue whose acceptance
+criterion is, verbatim, getting "one real overage header set captured."
+
+The three assumptions, in the order they would hurt:
+
+`overage-utilization` has a real ceiling behind it. If extra usage is
+uncapped, there is no denominator, the blue bar has no length, and the
+correct display is the uncapped fallback in `explore.html` section 4 — a full
+vessel with the diamond and the pace word retired, because pace against an
+unbounded budget is undefined. The `allowed_warning` status implies a cap
+exists, which is the only reason to think otherwise.
+
+The overage window resets with the window it belongs to. **Measured
+2026-09-20, and false.** A live header set off the device reads
+`overage-reset` = 1790812800 = 2026-10-01 00:00 UTC, against a 7-day reset of
+2026-09-26 and a 5-hour reset of 2026-09-21 01:50. Midnight UTC on the first
+of the month is a billing boundary, not a rolling window — the extra-usage
+allowance is monthly and shares no edge with either window the dashboard
+draws.
+
+So the diamond is wrong on the overage bar. It is placed by the base window's
+elapsed fraction, and the bar underneath it is filling against a month. At the
+end of a 5-hour window the diamond sits at the bottom of a vessel that has
+27 days left to run. The fix needs an elapsed fraction of its own, and that
+needs the window's *start*, which no header carries — but a monthly boundary
+is derivable: the reset is the first of the month, so the start is the first
+of the previous month. That is an assumption too, and a far cheaper one than
+the one it replaces.
+
+`overage-utilization` is a 0–1 fraction. **Measured 2026-09-20, and true** —
+it reads `0.0` on an ordinary response, in the same shape as its siblings. The
+reasoning that held before the measurement: those siblings are documented as
+fractions in `data-inventory.md`, and `api.cpp` multiplies them by 100. It is called out because the first cut of the
+parsing divided by 100 instead, which would have been wrong by four orders
+of magnitude and rendered an empty bar forever.
+
+Two things the search did settle, both of which were bugs.
+
+**"In overage" is not "the overage-status header is present."** That header
+rides on ordinary responses too: a plan that simply blocks at 100% carries
+`overage-status: rejected` all day. The wall is `unified-status: rejected`;
+past it, `overage-status` says which side you are on. The device keyed on
+presence until 2026-09-20, which would have shown the overage treatment
+permanently.
+
+**The capture had no way to happen, until 2026-09-20.** The five headers had
+been printed on every fetch since 2026-09-08, and printing is not logging:
+`Serial.printf` is a live stream out the USB port, and this device sits on a
+desk with nothing attached. The one event worth seeing would have printed to
+nobody. "Read the serial log next time" described a mechanism that did not
+exist.
+
+It does now. The first header set seen while `unified-status` is `rejected`
+is pinned to NVS under the `ovcap` namespace and never overwritten — a later
+overage cannot be more informative, and overwriting would lose the thing we
+waited for. The values are stored as **raw strings**, because the open
+questions are about the format itself: parsing `overage-utilization` before
+storing it would discard the evidence for whether it is a fraction, whether
+it passes 1.0, and whether `5h-utilization` pegs or climbs. Both window
+utilizations are pinned alongside it for that reason.
+
+Every boot prints whatever is pinned, or says nothing has been captured. So
+the retrieval is: plug in a cable whenever you like, days or weeks later, and
+read the `[CAP]` block.
+
+One caveat found on 2026-09-20, while trying to read it: that block prints in
+the first two seconds of boot, and on this board those two seconds are only
+reachable from a terminal that is already attached across a reset. Native USB
+means the ROM bootloader and the application are different USB devices, and a
+handle opened on either side of that switch gets nothing from the other. So
+retrieval is `pio device monitor`, then the reset button — a keyboard job, not
+a scriptable one. `tools/readboot.py` documents the measurement.
+
+### What a live non-overage header set already told us — 2026-09-20
+
+The `[CAP]` block did not have to wait for an overage event to be worth
+reading. The ordinary fetch line beside it carries the whole overage family on
+every response:
+
+    [API] status: allowed  overage: status=allowed util=0.0 reset=1790812800 disabled=-
+
+Three things fall out of one line. `overage-utilization` is present, parseable
+and a fraction *outside* overage, which settles the third assumption. The
+wall is `unified-status`, not the presence of an overage header — `status:
+allowed overage: status=allowed` at low usage is the proof, and it is the bug
+fixed the same day. And `overage-reset` is a monthly billing boundary, which
+breaks the diamond as described above.
+
+What still needs the real capture: whether `overage-utilization` climbs past
+1.0, and whether `5h-utilization` pegs at 1.0 past the wall or keeps going.
+Both are questions about behaviour at a boundary this account has not crossed
+since the instrumentation existed.
+
+## The refresh indicator — a clock that fills, then a spinner
+
+**2026-09-20.** The control column's third circle is the first of the three to
+mean anything. It is a ring that closes clockwise from twelve as the poll
+interval runs down, and a spinner while the fetch it was counting towards is
+in flight.
+
+The thing it replaces is the `updated 47s ago` line, which cost a row of text
+and answered the wrong question. The age of the last reading is only
+interesting as a proxy for the one you actually want — *when does this number
+change next* — and the proxy breaks exactly when it matters, because a reading
+that is 47 seconds old and a reading that is 47 seconds old because every
+fetch since has failed look the same in words. A ring that fills says the
+same thing without a word, and an empty one that stays empty says the other
+thing by itself.
+
+It is also honest about cost. Every poll is a real API call that spends a
+sliver of the budget the screen is reporting, so the thing that spends it
+should be something you can watch. That is the argument in *Refresh as a
+visible, tappable object* in `plan.md`, and this is the first half of it. The
+second half is the tap, which needs somewhere for a manual refresh to go.
+
+**All three circles are drawn by one test.** A pixel is in the circle when its
+centre falls inside a radius-16 circle centred on the 32px box. That is
+exactly what Figma means by a 32px ellipse, and it is something `fillCircle()`
+cannot express — an integer centre always yields an odd diameter, so a 32px
+circle would sit half a pixel off its own frame. `fillRoundRect()` with a
+radius of half its side gets within a pixel, which is close enough for a disc
+standing alone and not close enough here: the first cut drew the discs that
+way and the pie by hand, and a full ring came out 32 pixels fatter than the
+identical circles above it. Nobody would have been able to name that; everyone
+would have seen it. Testing pixels is the same escape `drawMarkX` takes, for
+the same reason, at the same negligible cost.
+
+## The dashboard has one touch target now
+
+**2026-09-20.** A tap anywhere used to open the menu. That was right when the
+dashboard had no controls on it — the whole screen was the button, and there
+was nothing else a tap could have meant. It stopped being right the moment the
+control column got three circles: it made them look decorative, and it left no
+way for the other two to ever mean anything.
+
+So the menu is the top circle, and the rest of the dashboard is inert. The
+touch zone is 56x56, not 32x32. Thirty-two pixels is about 5mm on this panel
+and the reliable floor is nearer 7mm — the same measurement that set the
+menu's row height. The zone runs to the top-right corner, so a tap that drifts
+toward the edge still lands on something rather than falling into dead space.
+Text is allowed to intrude on it; nothing there is interactive.
+
+The cost is that the device is less obviously alive to a stranger poking at
+it. That is worth paying to get a control column that can hold controls.
 
 ## Touch targets need ~7mm
 

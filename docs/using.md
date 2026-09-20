@@ -158,10 +158,10 @@ confident stale number.
 | Status line | Meaning | What to do |
 |---|---|---|
 | `updated 12s ago` | Normal | Nothing |
-| `Nm old — can't refresh (auth_failed)` | Token rejected — usually expired | Re-run `claude setup-token`, factory reset, set up again |
-| `Nm old — can't refresh (no_usage_h_200)` | Authenticated, but this plan publishes no usage headers | Expected on Enterprise and API-billed accounts. Nothing to fix |
-| `Nm old — can't refresh (http_-1)` | Network or TLS failure | Usually transient. Check WiFi |
-| `no reading yet — retrying` | Failed before ever succeeding, so there is nothing to keep | Check WiFi and token |
+| `Nm old, can't refresh (auth_failed)` | Token rejected — usually expired | Re-run `claude setup-token`, factory reset, set up again |
+| `Nm old, can't refresh (no_usage_h_200)` | Authenticated, but this plan publishes no usage headers | Expected on Enterprise and API-billed accounts. Nothing to fix |
+| `Nm old, can't refresh (http_-1)` | Network or TLS failure | Usually transient. Check WiFi |
+| `no reading yet, retrying` | Failed before ever succeeding, so there is nothing to keep | Check WiFi and token |
 | `waiting for first reading` | Booted, nothing fetched yet | Normal for the first few seconds |
 | `reset unknown` under a bar | No reset time, or the clock has not synced | Should resolve within a minute of boot. NTP now retries with backoff and keeps trying in the background |
 | `--` instead of a percentage | No data at all this session | See the status line |
@@ -175,7 +175,7 @@ live throughout, including touch.
 are still worth reading — they are just old, and the status line says how old:
 
 ```
-14m old — can't refresh (http_-1)
+14m old, can't refresh (http_-1)
 ```
 
 Two facts in that order, because the numbers are what you came for. Only a

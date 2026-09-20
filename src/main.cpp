@@ -197,6 +197,7 @@ void setup() {
     for (int i = 0; i < 30 && !clockValid(); i++) { delay(100); clockTick(); }
 
     uiBootProgress(95, "Fetching usage...");
+    apiDumpOverageCapture();
     fetcherBegin();
     requestRefresh();
 }
@@ -211,8 +212,9 @@ void loop() {
 
     // ── Touch ──────────────────────────────────────────
     // Raw coordinates, not BtnA/B/C. The synthesised buttons still exist for
-    // the PIN screen, but the dashboard and menu read taps directly so a tap
-    // anywhere can open the menu.
+    // the PIN screen; the dashboard and menu read taps directly. The dashboard
+    // has exactly one target, the menu button at the top of the control
+    // column, and the menu closes on a tap outside its rows.
     static int s_hot = -1;
     if (M5.Touch.getCount()) {
         auto t = M5.Touch.getDetail(0);
@@ -242,7 +244,7 @@ void loop() {
                     uiMenu(-1, g_settings.brightness);
                 }
             }
-        } else if (t.wasClicked()) {
+        } else if (t.wasClicked() && uiMenuButtonHit(t.x, t.y)) {
             s_screen = SCREEN_MENU;
             s_hot = -1;
             uiMenu(-1, g_settings.brightness);
@@ -259,7 +261,7 @@ void loop() {
     unsigned long interval = fetcherBusy() ? 300 : 1000;
     if (s_screen == SCREEN_DASH && millis() - lastRedraw > interval) {
         uiDashboard(g_usage, g_lastFetchMs, WiFi.RSSI(), halBatPercent(),
-                    fetcherBusy());
+                    fetcherBusy(), g_settings.pollSec);
         lastRedraw = millis();
     }
 

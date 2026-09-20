@@ -31,7 +31,7 @@ static void flush() {
 // ── Palette ───────────────────────────────────────────────
 // Warm near-black rather than pure black: on an IPS panel in a lit room pure
 // black reads as a dead pixel field, and this thing sits on a desk all day.
-static uint16_t C_BG, C_CARD, C_TEXT, C_DIM, C_ACCENT, C_OK, C_WARN, C_CRIT;
+static uint16_t C_BG, C_CARD, C_TEXT, C_DIM, C_ACCENT, C_OK, C_WARN, C_CRIT, C_PAY;
 
 static void initPalette() {
     C_BG     = lcd.color565(0x14, 0x11, 0x0F);
@@ -42,6 +42,7 @@ static void initPalette() {
     C_OK     = lcd.color565(0x5F, 0xA6, 0x72);
     C_WARN   = lcd.color565(0xD9, 0xA4, 0x41);
     C_CRIT   = lcd.color565(0xD9, 0x56, 0x4F);
+    C_PAY    = lcd.color565(0x6E, 0x93, 0xC9);
 }
 
 // Colour comes from the RELATIONSHIP between spend and elapsed time, not from
@@ -118,8 +119,29 @@ static void drawPaceTick(int cx, int cy, uint16_t halo, uint16_t ink) {
     }
 }
 
+// The blocked mark's X, plotted a pixel at a time. Font2's own 'X' blobs
+// against the edge of a 14px circle, and a 45-degree diagonal is exact, so
+// there is nothing here a line routine would do better -- and plotting it
+// the same way in docs/sim guarantees the two agree pixel for pixel.
+// Two 45-degree bands, each tested per pixel rather than plotted along a line:
+// stepping along one diagonal while offsetting along the other only ever lands
+// on pixels of one parity, which comes out as a checkerboard. Rotate the
+// coordinates instead -- a = along one arm, b = across it -- and the band
+// fills solid with its ends cut square to the arm.
+static void drawMarkX(int cx, int cy, int arm, uint16_t col, int thick = 2) {
+    const int len = arm * 2, r = arm + thick;
+    for (int dy = -r; dy <= r; dy++)
+        for (int dx = -r; dx <= r; dx++) {
+            const int a = dx + dy, b = dx - dy;
+            const int aa = a < 0 ? -a : a, ab = b < 0 ? -b : b;
+            if ((ab <= thick && aa <= len) || (aa <= thick && ab <= len))
+                g->drawPixel(cx + dx, cy + dy, col);
+        }
+}
+
 // The caption under the diamond says in words what the gap between the markers
-// shows. Five steps, keyed to the same breaks paceColor() uses, so words and
+// shows. Five steps -- well/a bit either side of on pace -- keyed to the same
+// breaks paceColor() uses, so words and
 // colour can never disagree. Behind and on-pace are dim; ahead takes the bar's
 // colour, because ahead is the one state worth noticing.
 //
@@ -132,9 +154,9 @@ static void drawPaceCaption(int bx, int bw, int y, float util, float elapsed) {
     const char* txt;
     uint16_t    col;
     if      (d >  0.15f) { txt = "well ahead";      col = C_CRIT; }
-    else if (d >  0.02f) { txt = "a little ahead";  col = C_WARN; }
+    else if (d >  0.02f) { txt = "a bit ahead";  col = C_WARN; }
     else if (d < -0.15f) { txt = "well behind";     col = C_DIM;  }
-    else if (d < -0.02f) { txt = "a little behind"; col = C_DIM;  }
+    else if (d < -0.02f) { txt = "a bit behind"; col = C_DIM;  }
     else                 { txt = "on pace";         col = C_DIM;  }
 
     g->setFont(&fonts::Font2);
@@ -270,6 +292,372 @@ static void drawSevenDayBar(int y, const UsageData& d) {
     if (e >= 0.0f) {
         drawPaceTick(bx + (int)(bw * e + 0.5f), by + bh / 2, C_BG, C_TEXT);
         drawPaceCaption(bx, bw, by + bh + 6, u / 100.0f, e);
+    }
+}
+
+// Same five-way split drawPaceCaption() uses, factored out so the vertical
+// layout's fixed-position caption (which can't centre on a moving diamond the
+// way the horizontal one does — see drawVBar) can reuse the words and colours
+// without re-typing the thresholds.
+static const char* paceWord(float util, float elapsed, uint16_t& col) {
+    const float d = util - elapsed;
+    if      (d >  0.15f) { col = C_CRIT; return "well ahead"; }
+    else if (d >  0.02f) { col = C_WARN; return "a bit ahead"; }
+    else if (d < -0.15f) { col = C_DIM;  return "well behind"; }
+    else if (d < -0.02f) { col = C_DIM;  return "a bit behind"; }
+    else                 { col = C_DIM;  return "on pace"; }
+}
+
+// Headline copy for the extra-usage states. Even at the vertical layout's
+// 12pt headline face, "near cap" and "blocked" are the widest words this
+// column can take — measured by rendering every state through docs/sim
+// before trusting it. overage-status values seen so far: allowed |
+// allowed_warning | rejected.
+static const char* overageWord(const char* status) {
+    if (strcmp(status, "rejected") == 0)        return "blocked";
+    if (strcmp(status, "allowed_warning") == 0) return "near cap";
+    if (strcmp(status, "allowed") == 0)         return "paying";
+    return "overage";
+}
+
+// ── Vertical dashboard ────────────────────────────────────
+// Two columns side by side instead of two bars stacked. Each bar fills
+// bottom-up, so its own bottom edge reads as exhaustion the same way the old
+// bar's right edge did. Whichever window the server names as binding gets the
+// wide column and the headline; the other gets the thin one — the same swap
+// the stacked layout did with drawWindowBar/drawSevenDayBar above. A reserved
+// column on the right stays empty on purpose: a fixed-width home for whatever
+// needs one later (signal, the menu button, an update spinner), rather than
+// more text fighting for room on a line that is already full.
+static constexpr int V7_X       = 91,  V7_W  = 24;   // thin (secondary) column
+static constexpr int V5_X       = 123, V5_W  = 48;   // wide (primary) column
+static constexpr int V5_TEXT_X  = 178;                // primary text, left-aligned
+static constexpr int V7_TEXT_R  = 84;                 // secondary text, right-aligned to this x
+static constexpr int V_CTRL_X   = 278, V_CTRL_W = 42;
+static constexpr int V_TITLE_Y  = 8, V_HEAD_Y = 29, V_FOOT_Y = 216;
+// The headline sits 2px left of the other rows: Sans Bold carries more left
+// bearing than Font2, so matching the box edges leaves the stems misaligned.
+static constexpr int V_HEAD_KERN = -2;
+static constexpr int V_REASON_Y = V_HEAD_Y + 27;  // third line of the stat block
+static constexpr int V_TRACK_H  = 224;   // both bars, every state: a bar that
+                                         // changes length makes the screen
+                                         // twitch exactly when it has something
+                                         // to say, and the 16px it gives up is a
+                                         // permanent home for the reset line and
+                                         // the end-of-bar token.
+// Tokens straddle the track's end edge, centred on it -- the frames put the X
+// across 209..237 and the '$' ink across 210..239 for an edge at 224.
+static constexpr int V_TOKEN_ARM = 11, V_TOKEN_T = 3, V_TOKEN_RING = 3;
+static constexpr int V_CIRCLE_Y[3] = { 11, 156, 198 };   // menu, signal, refresh
+static constexpr int V_CIRCLE_D    = 32;                 // the frames say 32, not 33
+
+// The refresh spinner, straight off the frame: eight 2x10 spokes between
+// radius 6 and radius 16, one of them dark and moving.
+static constexpr int   V_SPOKES   = 8;
+static constexpr float V_SPOKE_R0 = 6.0f, V_SPOKE_R1 = 16.0f;
+static constexpr float V_SPOKE_HW = 1.0f;                // half of 2px
+
+// The menu button's touch zone, which is deliberately bigger than the circle
+// it belongs to. 32px is about 5mm on this panel and the reliable floor is
+// nearer 7mm -- the same measurement that set the menu's row height. The zone
+// runs to the top-right corner so a tap that drifts toward the edge still
+// lands on something.
+static constexpr int V_MENU_HIT_L = 264, V_MENU_HIT_T = 0;
+static constexpr int V_MENU_HIT_R = 320, V_MENU_HIT_B = 56;
+
+// The pace caption rides with the diamond, so the mark and the words read as
+// one object rather than two facts on the same screen. It steps aside when
+// that would land it on a row that never moves. Same intent as
+// drawPaceCaption's clamp in the horizontal layout, turned ninety degrees:
+// there it dodged the bar's own ends, here it dodges the headline and the
+// reset line.
+// The panel has no text-stroke primitive, so a knockout ring is the glyph
+// drawn on a disc of offsets in the ring colour, then once more on top in its
+// own. About twenty extra draws of one character, which is nothing once per
+// refresh, and the only way to separate a bar-coloured token from its bar.
+static void outlinedGlyph(const char* ch, const lgfx::IFont* font, int x, int y,
+                          uint16_t fill, uint16_t ring, int weight) {
+    g->setFont(font);
+    g->setTextDatum(top_left);
+    g->setTextColor(ring, ring);
+    for (int dy = -weight; dy <= weight; dy++)
+        for (int dx = -weight; dx <= weight; dx++)
+            if (dx * dx + dy * dy <= weight * weight) g->drawString(ch, x + dx, y + dy);
+    g->setTextColor(fill, fill);
+    g->drawString(ch, x, y);
+}
+
+// ── The control column's circles ──────────────────────────
+// Every circle in this column is 32 pixels across and drawn the same way: a
+// pixel belongs to it when its centre falls inside a radius-16 circle centred
+// on the box. That is exactly what Figma means by a 32px ellipse, which
+// fillCircle() cannot express -- an integer centre always yields an odd
+// diameter -- and it also keeps the three circles identical to each other.
+// fillRoundRect() gets within a pixel, but the pie below has to agree with
+// its own ring perfectly, and "within a pixel" is what makes a full ring look
+// fatter than the disc beside it. drawMarkX already established that testing
+// pixels is the cheap, exact way out of this.
+static constexpr float V_CIRCLE_R = V_CIRCLE_D * 0.5f;
+
+static void ctrlDisc(int y, uint16_t col) {
+    for (int py = 0; py < V_CIRCLE_D; py++)
+        for (int px = 0; px < V_CIRCLE_D; px++) {
+            const float dx = px + 0.5f - V_CIRCLE_R, dy = py + 0.5f - V_CIRCLE_R;
+            if (dx * dx + dy * dy <= V_CIRCLE_R * V_CIRCLE_R)
+                g->drawPixel(V_CTRL_X + px, y + py, col);
+        }
+}
+
+// The empty track the pie fills into: a one-pixel ring, inside the same
+// circle, matching the frame's inside stroke.
+static void ctrlRing(int y, uint16_t col) {
+    const float inner = V_CIRCLE_R - 1.0f;
+    for (int py = 0; py < V_CIRCLE_D; py++)
+        for (int px = 0; px < V_CIRCLE_D; px++) {
+            const float dx = px + 0.5f - V_CIRCLE_R, dy = py + 0.5f - V_CIRCLE_R;
+            const float d2 = dx * dx + dy * dy;
+            if (d2 <= V_CIRCLE_R * V_CIRCLE_R && d2 > inner * inner)
+                g->drawPixel(V_CTRL_X + px, y + py, col);
+        }
+}
+
+// A pie filled clockwise from twelve o'clock, in the same circle, so a full
+// one is indistinguishable from the disc.
+static void ctrlWedge(int y, float frac, uint16_t col) {
+    if (frac <= 0.0f) return;
+    if (frac > 1.0f) frac = 1.0f;
+    const float sweep = frac * 2.0f * (float)M_PI;
+    for (int py = 0; py < V_CIRCLE_D; py++)
+        for (int px = 0; px < V_CIRCLE_D; px++) {
+            const float dx = px + 0.5f - V_CIRCLE_R, dy = py + 0.5f - V_CIRCLE_R;
+            if (dx * dx + dy * dy > V_CIRCLE_R * V_CIRCLE_R) continue;
+            float a = atan2f(dx, -dy);          // clockwise from straight up
+            if (a < 0.0f) a += 2.0f * (float)M_PI;
+            if (a < sweep) g->drawPixel(V_CTRL_X + px, y + py, col);
+        }
+}
+
+// Eight spokes with one missing, the gap advancing a step per redraw. The
+// cheapest thing that reads as rotation, and the one the frame draws. Each
+// spoke is tested in its own rotated frame: distance along the spoke against
+// the two radii, distance across it against half the width.
+static void ctrlSpokes(int y, int gap, uint16_t col) {
+    for (int py = 0; py < V_CIRCLE_D; py++)
+        for (int px = 0; px < V_CIRCLE_D; px++) {
+            const float dx = px + 0.5f - V_CIRCLE_R;
+            const float dy = py + 0.5f - V_CIRCLE_R;
+            for (int k = 0; k < V_SPOKES; k++) {
+                if (k == gap) continue;
+                const float a  = k * (2.0f * (float)M_PI / V_SPOKES);
+                const float ux = sinf(a), uy = -cosf(a);   // k = 0 points up
+                const float t  =  dx * ux + dy * uy;       // along
+                const float sx = -dx * uy + dy * ux;       // across
+                if (t >= V_SPOKE_R0 && t < V_SPOKE_R1 &&
+                    sx >= -V_SPOKE_HW && sx < V_SPOKE_HW) {
+                    g->drawPixel(V_CTRL_X + px, y + py, col);
+                    break;
+                }
+            }
+        }
+}
+
+// Two states, one object: a ring that fills clockwise as the poll interval
+// runs down, and a spinner while the fetch it was counting towards is actually
+// happening. Making the interval visible is the point. Every poll spends a
+// sliver of the budget this screen reports, so the thing that spends it should
+// be something you can watch, and eventually tap to pull forward -- see
+// "Refresh as a visible, tappable object" in plan.md.
+static void drawRefreshIndicator(int y, bool fetching, float frac) {
+    if (fetching) {
+        static uint8_t phase = 0;
+        ctrlSpokes(y, phase % V_SPOKES, C_DIM);
+        phase++;
+        return;
+    }
+    ctrlRing(y, C_DIM);
+    ctrlWedge(y, frac, C_DIM);
+}
+
+// Straddles the track's end edge -- the boundary you just crossed. The ring is
+// C_BG, which separates the token from the bar above it and then vanishes into
+// the background below, so it reads as emerging from the bar's end rather than
+// sitting on top of it. The '$' is placed by its ink, not its box:
+// FreeSansBold18pt7b puts that glyph's 29 rows flush with the box top, so the
+// box goes 29 above the base.
+static void drawToken(int cx, bool rejected) {
+    const uint16_t col = rejected ? C_CRIT : C_PAY;
+    if (rejected) {
+        drawMarkX(cx, V_TRACK_H, V_TOKEN_ARM, C_BG, V_TOKEN_T + V_TOKEN_RING);
+        drawMarkX(cx, V_TRACK_H, V_TOKEN_ARM, col,  V_TOKEN_T);
+    } else {
+        g->setFont(&fonts::FreeSansBold18pt7b);
+        const int w = g->textWidth("$");
+        outlinedGlyph("$", &fonts::FreeSansBold18pt7b, cx - (w >> 1),
+                      V_TRACK_H - 14, col, C_BG, V_TOKEN_RING);
+    }
+}
+
+static int captionY(int tickCy, bool primary, bool showReason = false) {
+    const int H = 16, lo = 0, hi = V_TRACK_H - H;
+    int y = tickCy - (H >> 1);
+    if (y < lo) y = lo;
+    if (y > hi) y = hi;
+    // {top, bottom} of every row that never moves in this column.
+    // Title and headline are one block now, so the caption has one obstacle
+    // above and one below, and its resting place is the row immediately under
+    // the block.
+    const int blockBot = primary ? (showReason ? V_REASON_Y + 16 : V_HEAD_Y + 23)
+                                 : V_TITLE_Y + 16;
+    const int avoid[][2] = { { V_TITLE_Y, blockBot },
+                             { V_FOOT_Y,  V_FOOT_Y + 16 } };
+    for (int i = 0; i < 2; i++) {
+        const int top = avoid[i][0], bot = avoid[i][1];
+        if (y >= bot || y + H <= top) continue;     // already clear
+        const int above = top - H - 2, below = bot + 2;
+        const bool fitsA = above >= lo, fitsB = below <= hi;
+        if (fitsA && fitsB) y = (tickCy < (top + bot) / 2) ? above : below;
+        else if (fitsA)     y = above;
+        else if (fitsB)     y = below;
+    }
+    if (y < lo) y = lo;
+    if (y > hi) y = hi;
+    return y;
+}
+
+// One column. `primary` picks the geometry (wide/right vs thin/left) and how
+// much text rides beside it; `days` puts week dividers on the 7-day bar and
+// none on the 5-hour one, whichever slot each is drawn in. `ov` is the
+// overage source and is only ever passed for the primary column, since extra
+// usage only applies to whichever window is currently binding. Normally the
+// bar runs the full screen height; it only gives up a strip at its own bottom
+// for the paid mark once overage is actually active, rather than paying that
+// cost all the time.
+static void drawVBar(bool primary, const char* label, float util,
+                     uint32_t resetEpoch, uint32_t windowSec, bool valid, int days,
+                     const UsageData* ov) {
+    const int trackX = primary ? V5_X : V7_X;
+    const int trackW = primary ? V5_W : V7_W;
+    const int textX  = primary ? V5_TEXT_X : V7_TEXT_R;
+    const textdatum_t td = primary ? top_left : top_right;
+
+    const bool overage  = primary && ov && ov->overageActive;
+    const bool rejected = overage && strcmp(ov->overageStatus, "rejected") == 0;
+    const bool showReason = rejected && ov->overageDisabledReason[0];
+    const int  trackH   = V_TRACK_H;
+
+    g->setFont(&fonts::Font2);
+    g->setTextDatum(td);
+    g->setTextColor(C_DIM, C_BG);
+    g->drawString(label, textX, V_TITLE_Y);
+
+    const float rem = 100.0f - util;
+    char resetTxt[24];
+    bool haveReset = valid && fmtReset(resetEpoch, resetTxt, sizeof(resetTxt),
+                                       windowSec > WIN_5H);
+    char ovResetTxt[24];
+    bool haveOvReset = overage && fmtReset(ov->overageResetEpoch, ovResetTxt,
+                                           sizeof(ovResetTxt), false);
+
+    if (primary) {
+        const bool plenty = rem >= 40.0f;
+        char headline[24];
+        uint16_t   hcol;
+        if (overage) {
+            strlcpy(headline, overageWord(ov->overageStatus), sizeof(headline));
+            hcol = rejected ? C_CRIT : C_PAY;
+        } else if (!valid) {
+            strlcpy(headline, "--", sizeof(headline)); hcol = C_DIM;
+        } else if (plenty) {
+            snprintf(headline, sizeof(headline), "%d%% left", (int)(rem + 0.5f)); hcol = C_TEXT;
+        } else if (haveReset) {
+            strlcpy(headline, resetTxt, sizeof(headline)); hcol = C_ACCENT;
+        } else {
+            strlcpy(headline, "--", sizeof(headline)); hcol = C_DIM;
+        }
+        g->setFont(&fonts::FreeSansBold12pt7b);
+        g->setTextDatum(top_left);
+        g->setTextColor(hcol, C_BG);
+        g->drawString(headline, textX + V_HEAD_KERN, V_HEAD_Y);
+
+        g->setFont(&fonts::Font2);
+        g->setTextDatum(top_left);
+        if (overage) {
+            if (rejected && ov->overageDisabledReason[0]) {
+                char reason[32];
+                strlcpy(reason, ov->overageDisabledReason, sizeof(reason));
+                for (char* p = reason; *p; p++) if (*p == '_') *p = ' ';
+                g->setTextColor(C_DIM, C_BG);
+                g->drawString(reason, textX, V_REASON_Y);
+            }
+            if (haveOvReset) {
+                g->setTextColor(C_DIM, C_BG);
+                g->drawString(ovResetTxt, textX, V_FOOT_Y);
+            }
+        } else if (valid && plenty && haveReset) {
+            g->setTextColor(C_DIM, C_BG);
+            g->drawString(resetTxt, textX, V_FOOT_Y);
+        } else if (valid && rem <= 0.0f) {
+            g->setTextColor(C_WARN, C_BG);
+            g->drawString("out", textX, V_FOOT_Y);
+        } else if (valid && rem < 12.0f) {
+            g->setTextColor(C_WARN, C_BG);
+            g->drawString("nearly out", textX, V_FOOT_Y);
+        }
+    } else if (haveReset) {
+        g->setTextColor(C_DIM, C_BG);
+        g->drawString(resetTxt, textX, V_FOOT_Y);
+    }
+
+    g->fillRoundRect(trackX, 0, trackW, trackH, 6, C_CARD);
+    float e = valid ? elapsedFraction(resetEpoch, windowSec) : -1.0f;
+    // Overage is an inner-stroked vessel holding whatever is left, not a
+    // flood: the bar's rule everywhere is "fill is what is available", so a
+    // solid bar would say everything remains. Blocked holds nothing; paying
+    // holds what the extra-usage allowance has left. Either way there is a
+    // fill edge again, so the diamond and the pace word keep their meaning.
+    float used = -1.0f;
+    if (overage) {
+        const uint16_t ring = rejected ? C_CRIT : C_PAY;
+        g->drawRoundRect(trackX, 0, trackW, trackH, 6, ring);
+        g->drawRoundRect(trackX + 1, 1, trackW - 2, trackH - 2, 5, ring);
+        float orem = rejected ? 0.0f : (1.0f - ov->overageUtil);
+        if (orem < 0.0f) orem = 0.0f;
+        if (orem > 1.0f) orem = 1.0f;
+        const int oh = (int)(trackH * orem + 0.5f);
+        if (oh > 0) g->fillRoundRect(trackX, trackH - oh, trackW, oh, 6, C_PAY);
+        used = 1.0f - orem;
+    } else if (valid) {
+        float u = util < 0 ? 0 : (util > 100 ? 100 : util);
+        int usedH = (int)(trackH * u / 100.0f + 0.5f);
+        int fillH = trackH - usedH;
+        if (fillH > 0) {
+            uint16_t col = (e >= 0.0f) ? paceColor(u / 100.0f, e) : C_OK;
+            g->fillRoundRect(trackX, usedH, trackW, fillH, 6, col);
+        }
+        if (days > 1) {
+            for (int i = 1; i < days; i++) {
+                g->drawFastHLine(trackX, trackH * i / days, trackW, C_BG);
+            }
+        }
+        used = u / 100.0f;
+    }
+    if (used >= 0.0f && e >= 0.0f) {
+        const int cy = (int)(trackH * e + 0.5f);
+        drawPaceTick(trackX + trackW / 2, cy, C_BG, C_TEXT);
+        uint16_t ccol;
+        const char* word = paceWord(used, e, ccol);
+        g->setFont(&fonts::Font2);
+        g->setTextDatum(td);
+        g->setTextColor(ccol, C_BG);
+        g->drawString(word, textX, captionY(cy, primary, showReason));
+    }
+
+    if (overage) {
+        // Blocked gets a mark too, not just a colour change: red-vs-blue alone
+        // doesn't survive a glance from across the desk, a dimmed backlight, or
+        // an eye that doesn't separate those two hues. The glyph carries the
+        // state; the colour only reinforces it.
+        drawToken(trackX + trackW / 2, rejected);
     }
 }
 
@@ -482,63 +870,38 @@ static void drawSpinner(int x, int y) {
 }
 
 void uiDashboard(const UsageData& data, unsigned long lastFetchMs, int rssi,
-                 int batPct, bool fetching) {
+                 int batPct, bool fetching, int pollSec) {
     g->fillScreen(C_BG);
 
-    // No title stripe, no button row. Those cost 62 of 240 pixels — 26% of the
-    // screen — telling you the device's name and where to tap. Tap anywhere.
-    //
-    // The 7-day window is promoted to a full bar only when the server says it
-    // is the binding constraint. That was 23% of requests in a large capture,
-    // so most of the time the 5-hour window gets the display to itself.
+    // Vertical layout, 2026-09-19 — two columns side by side instead of two
+    // bars stacked; see the decision log in plan.md and drawVBar() above for
+    // the reasoning. The 7-day window is promoted to the wide column only
+    // when the server says it is the binding constraint — 23% of requests in
+    // a large capture — so most of the time the 5-hour window gets it.
     const bool sevenBinds = data.ok && strncmp(data.claim, "seven_day", 9) == 0;
 
-    // Vertical placement. Each full bar now carries two rows beneath it (the
-    // caption, then the footnote), so the blocks are taller than they were and
-    // the budget is tight: two full bars end at 213 against a status line at
-    // 222. The normal layout has room to spare, so the 5-hour block sits a
-    // little above centre, where a heavy element's optical centre wants to be.
     if (sevenBinds) {
-        drawWindowBar(16,  "5-HOUR", data.h5, data.h5ResetEpoch, WIN_5H, data.ok);
-        drawWindowBar(116, "7-DAY",  data.d7, data.d7ResetEpoch, WIN_7D, data.ok);
+        drawVBar(false, "5-HOUR", data.h5, data.h5ResetEpoch, WIN_5H, data.ok, 1, nullptr);
+        drawVBar(true,  "7-DAY",  data.d7, data.d7ResetEpoch, WIN_7D, data.ok, 7, &data);
     } else {
-        drawWindowBar(40, "5-HOUR", data.h5, data.h5ResetEpoch, WIN_5H, data.ok);
-        drawSevenDayBar(150, data);
+        drawVBar(true,  "5-HOUR", data.h5, data.h5ResetEpoch, WIN_5H, data.ok, 1, &data);
+        drawVBar(false, "7-DAY",  data.d7, data.d7ResetEpoch, WIN_7D, data.ok, 7, nullptr);
     }
 
-    // Failure is graded by how much of the screen it makes untrue, and staleness
-    // is stated here in words rather than implied by a colour somewhere small.
-    // A number that was right twelve minutes ago is still worth reading; the
-    // reader just has to know it is twelve minutes old.
-    g->setFont(&fonts::Font2);
-    g->setTextDatum(top_left);
+    // Three circles: menu, signal, refresh. The first two are still discs
+    // standing in for icons. The third is real as of 2026-09-20, and it is
+    // the one that matters most -- a stale reading that looks fresh is the
+    // failure this device exists to make visible, and a ring you can watch
+    // fill says when the next reading is due without spending a line of text
+    // on it. See docs/design-decisions.md.
+    ctrlDisc(V_CIRCLE_Y[0], C_DIM);
+    ctrlDisc(V_CIRCLE_Y[1], C_DIM);
 
-    const int32_t age = fetcherAgeSec();
-    const char*   err = fetcherLastError();
+    float frac = 1.0f;
+    if (pollSec > 0)
+        frac = (float)(millis() - lastFetchMs) / ((float)pollSec * 1000.0f);
+    drawRefreshIndicator(V_CIRCLE_Y[2], fetching, frac);
 
-    if (age < 0) {
-        g->setTextColor(C_DIM, C_BG);
-        g->drawString(err[0] ? "no reading yet — retrying" : "waiting for first reading",
-                      16, 222);
-    } else {
-        char sline[64];
-        char ago[16];
-        if (age < 90) snprintf(ago, sizeof(ago), "%ds", (int)age);
-        else          snprintf(ago, sizeof(ago), "%dm", (int)(age / 60));
-
-        if (err[0]) {
-            // Stale: real numbers, failing refresh. Both facts, in that order,
-            // because the numbers are what the reader came for.
-            snprintf(sline, sizeof(sline), "%s old — can't refresh (%s)", ago, err);
-            g->setTextColor(C_WARN, C_BG);
-        } else {
-            snprintf(sline, sizeof(sline), "updated %s ago", ago);
-            g->setTextColor(C_DIM, C_BG);
-        }
-        g->drawString(sline, 16, 222);
-    }
-
-    if (fetching) drawSpinner(SCREEN_W - 26, 222);
     flush();
 }
 
@@ -628,4 +991,12 @@ void uiError(const char* title, const char* detail) {
         g->drawString(detail, SCREEN_W / 2, 140);
     }
     flush();
+}
+
+// The dashboard's one touch target. Everything else on that screen is inert
+// for now: a tap anywhere used to open the menu, which made the circles look
+// decorative and left no room for the other two to mean anything.
+bool uiMenuButtonHit(int x, int y) {
+    return x >= V_MENU_HIT_L && x < V_MENU_HIT_R &&
+           y >= V_MENU_HIT_T && y < V_MENU_HIT_B;
 }
