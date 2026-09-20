@@ -618,26 +618,75 @@
     });
   }
 
+  // ── PIN keypad ──────────────────────────────────────────
+  // Ten targets instead of one. The old screen dialled each digit with
+  // BtnA/BtnB -- up to ten taps a digit plus a confirm, 36 at worst, on a
+  // device that reboots every time it is flashed. Keys are 96x46; 46px is
+  // about 7.3mm, the size the menu rows had to be before they were reliable.
+  // Four rows plus the dots is 238 of 240, which is why there is no confirm
+  // key: the fourth digit submits.
+  const PIN_KEY_W = 96, PIN_KEY_H = 46, PIN_KEY_GX = 8, PIN_KEY_GY = 2;
+  const PIN_KEY_X0 = 8, PIN_KEY_Y0 = 48;
+  const PIN_DOT_Y = 24, PIN_DOT_R = 7, PIN_DOT_PITCH = 34;
+  const PIN_DEL = 10;
+  const PIN_KEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9, -1, 0, PIN_DEL];
+
+  function pinKeyBox(k) {
+    return [PIN_KEY_X0 + (k % 3) * (PIN_KEY_W + PIN_KEY_GX),
+            PIN_KEY_Y0 + ((k / 3) | 0) * (PIN_KEY_H + PIN_KEY_GY)];
+  }
+
+  function pinKeyAt(tx, ty) {
+    for (let k = 0; k < 12; k++) {
+      if (PIN_KEYS[k] < 0) continue;
+      const [x, y] = pinKeyBox(k);
+      if (tx >= x && tx < x + PIN_KEY_W && ty >= y && ty < y + PIN_KEY_H) return PIN_KEYS[k];
+    }
+    return -1;
+  }
+
+  // A backspace arrow, tested per pixel the way drawMarkX is: Font2 is ASCII
+  // only so the glyph cannot be typed, and three half-plane tests are less
+  // code than a triangle primitive nothing else would use.
+  function drawBackspace(g, cx, cy, col) {
+    const h = 9, tip = 9, body = 11;
+    for (let dy = -h; dy <= h; dy++) {
+      const ady = Math.abs(dy);
+      for (let dx = -tip + ady; dx <= body; dx++)
+        if (dx < 0 || ady <= h - 2) g.drawPixel(cx + dx, cy + dy, col);
+    }
+  }
+
+  // s: { entered: 0..4, pressed: key under a finger or -1 }
   function pin(g, T, s) {
     g.fillScreen(T.bg);
-    g.setFont(T.small); g.setTextDatum(TC); g.setTextColor(T.dim, T.bg);
-    g.drawString('ENTER PIN', 160, 30);
-    const bw = 46, bh = 62, gap = 14, total = bw * 4 + gap * 3, x0 = (320 - total) >> 1, y0 = 66;
+    const entered = s.entered !== undefined ? s.entered : (s.pos || 0);
+    const pressed = typeof s.pressed === 'number' ? s.pressed : -1;
+
+    // Four dots, filled as digits land. No digit is ever shown: the old screen
+    // had to show the one being edited because there was no other way to know
+    // what you were dialling, which is not a property anyone wanted.
+    const x0 = 160 - (PIN_DOT_PITCH * 3) / 2;
     for (let i = 0; i < 4; i++) {
-      const x = x0 + i * (bw + gap), active = i === s.pos;
-      g.fillRoundRect(x, y0, bw, bh, 6, T.card);
-      if (active) g.drawRoundRect(x, y0, bw, bh, 6, T.accent);
-      g.setTextDatum(LGFX.MC);
-      if (i < s.pos) g.fillCircle(x + (bw >> 1), y0 + (bh >> 1), 6, T.dim);
-      else if (active) {
-        g.setFont(T.headline); g.setTextColor(T.text, T.card);
-        g.drawString(String(s.digits[i]), x + (bw >> 1), y0 + (bh >> 1));
-        g.setFont(T.small);
+      const cx = x0 + i * PIN_DOT_PITCH;
+      if (i < entered) g.fillCircle(cx, PIN_DOT_Y, PIN_DOT_R, T.text);
+      else             g.drawCircle(cx, PIN_DOT_Y, PIN_DOT_R, T.dim);
+    }
+
+    for (let k = 0; k < 12; k++) {
+      const val = PIN_KEYS[k];
+      if (val < 0) continue;
+      const [x, y] = pinKeyBox(k), hot = val === pressed;
+      g.fillRoundRect(x, y, PIN_KEY_W, PIN_KEY_H, 8, hot ? T.accent : T.card);
+      if (val === PIN_DEL) {
+        drawBackspace(g, x + PIN_KEY_W / 2, y + PIN_KEY_H / 2, hot ? T.bg : T.dim);
+      } else {
+        g.setFont('FreeSansBold18pt7b');
+        g.setTextDatum(LGFX.MC);
+        g.setTextColor(hot ? T.bg : T.text, hot ? T.accent : T.card);
+        g.drawString(String(val), x + PIN_KEY_W / 2, y + PIN_KEY_H / 2);
       }
     }
-    g.setTextDatum(TC); g.setTextColor(T.dim, T.bg);
-    g.drawString('touch the labels below', 160, y0 + bh + 18);
-    drawButtonHints(g, T, '+1', 'NEXT', '');
   }
 
   // ── Interstitials, as shipped ───────────────────────────
@@ -714,7 +763,7 @@
               V_DOT_RING, V_DOT_R, V_FAIL_HOLD_MS,
               V_MENU_HIT_L, V_MENU_HIT_T, V_MENU_HIT_R, V_MENU_HIT_B };
 
-  window.SCREENS = { SHIPPED, dashboard, menu, pin, boot, setup, connecting, lockout, error,
+  window.SCREENS = { SHIPPED, dashboard, menu, pin, pinKeyAt, boot, setup, connecting, lockout, error,
                      paceColor, drawPaceTick, drawPaceCaption, paceWord, overageWord, drawVBar,
                      drawMarkX, captionY, drawToken, outlinedGlyph, V,
                      ctrlDisc, ctrlRing, ctrlWedge, ctrlSpokes,

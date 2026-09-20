@@ -45,18 +45,29 @@ unsigned long g_lastFetchMs = 0;
 
 // ── PIN entry (blocks until four digits are confirmed) ────
 static void enterPin(char* pinOut, int maxLen) {
-    int digits[4] = {0, 0, 0, 0};
-    int pos = 0;
-    while (pos < 4) {
-        uiPinScreen(pos, digits);
-        while (true) {
-            halUpdate();
-            if (halBtnAWasPressed()) { digits[pos] = (digits[pos] + 1) % 10; break; }
-            if (halBtnBWasPressed()) { pos++; break; }
-            delay(20);
+    char buf[5] = {0};
+    int  n = 0, pressed = -1;
+    uiPinScreen(0);
+    while (n < 4) {
+        halUpdate();
+        if (M5.Touch.getCount()) {
+            auto t = M5.Touch.getDetail(0);
+            if (t.isPressed()) {
+                // Redraw only when the finger moves to a different key, so a
+                // held touch is not a redraw loop.
+                const int k = uiPinKeyAt(t.x, t.y);
+                if (k != pressed) { pressed = k; uiPinScreen(n, pressed); }
+            } else if (t.wasClicked()) {
+                const int k = uiPinKeyAt(t.x, t.y);
+                pressed = -1;
+                if (k == UI_PIN_DEL) { if (n > 0) buf[--n] = '\0'; }
+                else if (k >= 0 && n < 4) buf[n++] = (char)('0' + k);
+                uiPinScreen(n);
+            }
         }
+        delay(10);
     }
-    snprintf(pinOut, maxLen, "%d%d%d%d", digits[0], digits[1], digits[2], digits[3]);
+    snprintf(pinOut, maxLen, "%s", buf);
 }
 
 // ── WiFi ──────────────────────────────────────────────────
@@ -126,11 +137,9 @@ static void unlockPhase(int progressPct) {
     }
     g_unlocked = true;
 
-    // Drain the button edges the last confirm left behind, so the dashboard
-    // does not immediately act on a phantom press.
-    halUpdate();
-    halBtnAWasPressed();
-    halBtnBWasPressed();
+    // Drain the touch edge the last keypress left behind, so the dashboard
+    // does not immediately read it as a tap on the menu button.
+    for (int i = 0; i < 10; i++) { halUpdate(); delay(10); }
 }
 
 void setup() {

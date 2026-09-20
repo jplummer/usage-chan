@@ -746,6 +746,10 @@ static void drawVBar(bool primary, const char* label, float util,
 // The bottom strip, used only by the screens that still drive BtnA/B/C — PIN
 // entry and boot. The dashboard has none: it reads raw taps, so it needs no
 // permanent legend and gets those 36 pixels back.
+// The bottom strip's labels. Nothing calls it now that the PIN screen has a
+// keypad -- kept because the setup and error screens may want it back, and
+// because deleting the only reader of TOUCH_BTN_H would strand that constant.
+__attribute__((unused))
 static void drawButtonHints(const char* a, const char* b, const char* c) {
     const int y = SCREEN_H - TOUCH_BTN_H;
     g->fillRect(0, y, SCREEN_W, TOUCH_BTN_H, C_CARD);
@@ -868,45 +872,87 @@ void uiConnecting(const char* ssid, int attempt) {
     flush();
 }
 
-void uiPinScreen(int pos, const int digits[4]) {
+// ── PIN keypad ────────────────────────────────────────────
+// Ten targets instead of one. The old screen dialled each digit with
+// BtnA/BtnB, which is up to ten taps a digit plus a confirm -- 36 taps at
+// worst, and this device reboots every time it is flashed. A 320x240 touch
+// panel can show a keypad; it just needs raw touch coordinates rather than
+// the three synthesised zones. See "A real PIN keypad" in plan.md, parked
+// since 2026-09-04.
+//
+// Keys are 96x46. 46px is about 7.3mm on this panel, which is the size the
+// menu rows had to be before they were reliable to hit -- see "Touch targets
+// need ~7mm" in docs/design-decisions.md. Four rows of them plus the dots is
+// 238 of the 240 rows available, which is why there is no confirm key: the
+// fourth digit submits, the way a phone lock screen does.
+static constexpr int PIN_KEY_W = 96, PIN_KEY_H = 46;
+static constexpr int PIN_KEY_GX = 8, PIN_KEY_GY = 2;
+static constexpr int PIN_KEY_X0 = 8, PIN_KEY_Y0 = 48;
+static constexpr int PIN_DOT_Y = 24, PIN_DOT_R = 7, PIN_DOT_PITCH = 34;
+
+// Row-major: 1-9, then a gap, 0 and backspace. -1 is a dead cell.
+static constexpr int PIN_KEYS[12] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, -1, 0, UI_PIN_DEL };
+
+static void pinKeyBox(int k, int& x, int& y) {
+    x = PIN_KEY_X0 + (k % 3) * (PIN_KEY_W + PIN_KEY_GX);
+    y = PIN_KEY_Y0 + (k / 3) * (PIN_KEY_H + PIN_KEY_GY);
+}
+
+int uiPinKeyAt(int tx, int ty) {
+    for (int k = 0; k < 12; k++) {
+        if (PIN_KEYS[k] < 0) continue;
+        int x, y; pinKeyBox(k, x, y);
+        if (tx >= x && tx < x + PIN_KEY_W && ty >= y && ty < y + PIN_KEY_H)
+            return PIN_KEYS[k];
+    }
+    return -1;
+}
+
+// A backspace arrow: a left-pointing triangle with a body, tested per pixel
+// the way drawMarkX is. Font2 is ASCII only, so the glyph cannot be typed,
+// and three half-plane tests are less code than teaching the simulator a
+// triangle primitive it has no other use for.
+static void drawBackspace(int cx, int cy, uint16_t col) {
+    const int h = 9, tip = 9, body = 11;      // half-height, arrow, tail
+    for (int dy = -h; dy <= h; dy++) {
+        const int ady = dy < 0 ? -dy : dy;
+        // The arrowhead narrows to the left; the body is a plain rectangle.
+        const int x0 = -tip + ady;
+        for (int dx = x0; dx <= body; dx++)
+            if (dx < 0 || ady <= h - 2) g->drawPixel(cx + dx, cy + dy, col);
+    }
+}
+
+void uiPinScreen(int entered, int pressed) {
     g->fillScreen(C_BG);
 
-    g->setFont(&fonts::Font2);
-    g->setTextDatum(top_center);
-    g->setTextColor(C_DIM, C_BG);
-    g->drawString("ENTER PIN", SCREEN_W / 2, 30);
-
-    // Four boxes. Digits already confirmed are masked; the one being edited
-    // shows its value, because otherwise there is no way to dial it in.
-    const int bw = 46, bh = 62, gap = 14;
-    const int total = bw * 4 + gap * 3;
-    const int x0 = (SCREEN_W - total) / 2;
-    const int y0 = 66;
-
+    // Four dots, filled as digits land. No digit is ever shown: the old screen
+    // had to show the one being edited because there was no other way to know
+    // what you were dialling, which is not a property anyone wanted.
+    const int x0 = SCREEN_W / 2 - (PIN_DOT_PITCH * 3) / 2;
     for (int i = 0; i < 4; i++) {
-        int x = x0 + i * (bw + gap);
-        bool active = (i == pos);
-        g->fillRoundRect(x, y0, bw, bh, 6, C_CARD);
-        if (active) g->drawRoundRect(x, y0, bw, bh, 6, C_ACCENT);
-
-        g->setTextDatum(middle_center);
-        if (i < pos) {
-            g->setTextColor(C_DIM, C_CARD);
-            g->fillCircle(x + bw / 2, y0 + bh / 2, 6, C_DIM);
-        } else if (active) {
-            char d[2] = {(char)('0' + digits[i]), 0};
-            g->setFont(&fonts::FreeSansBold24pt7b);
-            g->setTextColor(C_TEXT, C_CARD);
-            g->drawString(d, x + bw / 2, y0 + bh / 2);
-            g->setFont(&fonts::Font2);
-        }
+        const int cx = x0 + i * PIN_DOT_PITCH;
+        if (i < entered) g->fillCircle(cx, PIN_DOT_Y, PIN_DOT_R, C_TEXT);
+        else             g->drawCircle(cx, PIN_DOT_Y, PIN_DOT_R, C_DIM);
     }
 
-    g->setTextDatum(top_center);
-    g->setTextColor(C_DIM, C_BG);
-    g->drawString("touch the labels below", SCREEN_W / 2, y0 + bh + 18);
-
-    drawButtonHints("+1", "NEXT", "");
+    for (int k = 0; k < 12; k++) {
+        const int val = PIN_KEYS[k];
+        if (val < 0) continue;
+        int x, y; pinKeyBox(k, x, y);
+        const bool hot = (val == pressed);
+        g->fillRoundRect(x, y, PIN_KEY_W, PIN_KEY_H, 8, hot ? C_ACCENT : C_CARD);
+        if (val == UI_PIN_DEL) {
+            drawBackspace(x + PIN_KEY_W / 2, y + PIN_KEY_H / 2,
+                          hot ? C_BG : C_DIM);
+        } else {
+            char d[2] = { (char)('0' + val), 0 };
+            g->setFont(&fonts::FreeSansBold18pt7b);
+            g->setTextDatum(middle_center);
+            g->setTextColor(hot ? C_BG : C_TEXT, hot ? C_ACCENT : C_CARD);
+            g->drawString(d, x + PIN_KEY_W / 2, y + PIN_KEY_H / 2);
+        }
+    }
     flush();
 }
 

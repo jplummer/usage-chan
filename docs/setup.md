@@ -1,19 +1,12 @@
 # Setting up Usage-Chan
 
-*Living document. Updated whenever the setup flow changes — if this drifts from
-what the device does, that is a bug in the document. Last checked against
-firmware 0.1.0.*
+*Living document. Updated whenever the setup flow changes — if this drifts from what the device does, that is a bug in the document. Last checked against firmware 0.1.0.*
 
-Setup happens once. It takes about five minutes, and four of those are waiting
-for things to reboot.
+Setup happens once. It takes about five minutes, and four of those are waiting for things to reboot.
 
 ## Before you start
 
-**Copy your token to the clipboard first.** This is the awkward part of the
-current flow and the reason it is called out here rather than buried in step 3.
-Setting up the device means joining a WiFi network it creates, which drops you
-off the internet — so anything you still need to look up is out of reach until
-you are finished.
+**Copy your token to the clipboard first.** This is the awkward part of the current flow and the reason it is called out here rather than buried in step 3. Setting up the device means joining a WiFi network it creates, which drops you off the internet — so anything you still need to look up is out of reach until you are finished.
 
 On your Mac:
 
@@ -27,34 +20,26 @@ That prints a token beginning `sk-ant-oat01-`. It is good for a year. Copy it.
 > *after* the device is on your home network, so you never have to prepare
 > anything in advance. See `plan.md`, phase 1.5. Until then, copy first.
 
-You will also invent a **4-digit PIN** during setup. It is the encryption key
-for the token, it is never stored anywhere, and the device asks for it at every
-boot. Forgetting it means a factory reset and a fresh token.
+You will also invent a **4-digit PIN** during setup. It is the encryption key for the token, it is never stored anywhere, and the device asks for it at every boot. Forgetting it means a factory reset and a fresh token.
 
 ## 1. Flash the firmware
 
-See [`flashing.md`](flashing.md), which covers what gets written and what it
-overwrites. Short version:
+See [`flashing.md`](flashing.md), which covers what gets written and what it overwrites. Short version:
 
 ```bash
 ~/.local/bin/pio run -t upload
 ```
 
-**There is no over-the-air update.** Every firmware change means a USB-C cable.
-Settings survive a reflash — NVS sits between the written regions and is not
-touched — so updating an already-configured device does not mean setting it up
-again.
+**There is no over-the-air update.** Every firmware change means a USB-C cable. Settings survive a reflash — NVS sits between the written regions and is not touched — so updating an already-configured device does not mean setting it up again.
 
 ## 2. Join the device's network
 
-On first boot the device has no configuration, so it creates its own WiFi
-network and shows the details on screen:
+On first boot the device has no configuration, so it creates its own WiFi network and shows the details on screen:
 
 - **Network:** `UsageChan-XXXX`, where XXXX comes from the device's MAC address
 - **Password:** eight characters, shown on screen, different for every device
 
-Join it from a phone or laptop. A captive portal should open by itself. If it
-does not, go to **http://192.168.4.1**.
+Join it from a phone or laptop. A captive portal should open by itself. If it does not, go to **http://192.168.4.1**.
 
 ## 3. Fill in the form
 
@@ -68,32 +53,27 @@ does not, go to **http://192.168.4.1**.
 | Screen brightness | Changeable later |
 | Device name | Cosmetic today; will become the device's `.local` hostname when the LAN panel lands |
 
-Submit. The device encrypts the token with your PIN, writes both to flash, and
-reboots.
+Submit. The device encrypts the token with your PIN, writes both to flash, and reboots.
 
 ## 4. Enter the PIN
 
 The device asks for the PIN at every boot, including this one.
 
-There are no physical buttons for this. The bottom 36 pixels of the touchscreen
-are three buttons, labelled on screen:
+There are no physical buttons for this. The bottom 36 pixels of the touchscreen are three buttons, labelled on screen:
 
 - **Left third** — advance the current digit
 - **Middle third** — confirm and move to the next digit
 
 Four digits, then it connects, syncs the clock, and fetches.
 
-If NTP is slow the boot continues anyway and keeps retrying in the background,
-so a stubborn network delays the countdowns rather than wedging the device.
+If NTP is slow the boot continues anyway and keeps retrying in the background, so a stubborn network delays the countdowns rather than wedging the device.
 
 > **Known rough edge.** Worst case this is 36 taps. The LAN panel will let you
 > type the PIN in a browser instead, which also unlocks the device.
 
 ## 5. Check it
 
-One bar with a diamond on it, a seven-day line underneath, and a status line.
-Cross-check the numbers against `claude /usage` on your Mac, or OpenUsage if you
-run it. [`using.md`](using.md) explains what the diamond means.
+One bar with a diamond on it, a seven-day line underneath, and a status line. Cross-check the numbers against `claude /usage` on your Mac, or OpenUsage if you run it. [`using.md`](using.md) explains what the diamond means.
 
 ## When setup goes wrong
 
@@ -109,6 +89,4 @@ run it. [`using.md`](using.md) explains what the diamond means.
 
 ## Starting over
 
-Hold the **bottom-left and bottom-middle** of the screen for two seconds during
-boot. That wipes stored settings — WiFi, token, preferences — and returns you to
-step 2. The firmware is untouched.
+Hold the **bottom-left and bottom-middle** of the screen for two seconds during boot. That wipes stored settings — WiFi, token, preferences — and returns you to step 2. The firmware is untouched.

@@ -1,23 +1,18 @@
 # What the device can actually learn
 
-Raw material for design decisions. Everything here is tagged by how well it is
-established, because most of this surface is undocumented and some of it is
-contradictory.
+Raw material for design decisions. Everything here is tagged by how well it is established, because most of this surface is undocumented and some of it is contradictory.
 
 - **DOCUMENTED** — Anthropic's own docs
 - **OBSERVED** — third-party source or captured traffic, multiple independent sources
 - **UNVERIFIED** — one source, or inference
 
-Compiled 2026-09-05. The undocumented parts have no stability guarantee and
-have already changed at least once.
+Compiled 2026-09-05. The undocumented parts have no stability guarantee and have already changed at least once.
 
 ---
 
 ## The headline: there are two ways to get usage, and we picked the expensive one
 
-Phase 1 does what claude-usage-stick does — POST to `/v1/messages` with
-`max_tokens: 1` and read four response headers. That works. But there is a
-second surface that is cheaper and much richer.
+Phase 1 does what claude-usage-stick does — POST to `/v1/messages` with `max_tokens: 1` and read four response headers. That works. But there is a second surface that is cheaper and much richer.
 
 | | `POST /v1/messages` (current) | `GET /api/oauth/usage` |
 |---|---|---|
@@ -30,35 +25,20 @@ second surface that is cheaper and much richer.
 | Reset format | **Unix epoch seconds** | **ISO 8601 string** |
 | Evidence | OBSERVED, plus this project's own hardware | OBSERVED across six projects |
 
-**The scale and format differ between the two.** `api.cpp` currently does
-`h5u.toFloat() * 100.0f` and `h5r.toInt()`, both correct for headers. Pointing
-the same parser at the JSON endpoint would render 48% as 4800% and every
-countdown as "due". Any switch has to change the parser, not just the URL.
+**The scale and format differ between the two.** `api.cpp` currently does `h5u.toFloat() * 100.0f` and `h5r.toInt()`, both correct for headers. Pointing the same parser at the JSON endpoint would render 48% as 4800% and every countdown as "due". Any switch has to change the parser, not just the URL.
 
-Endpoint existence checked directly from this machine, unauthenticated:
-`GET /api/oauth/usage` returns **429** (rate-limited) where a fabricated path
-under the same prefix returns **404**. The path is real — and that 429 is a
-preview of its temperament.
+Endpoint existence checked directly from this machine, unauthenticated: `GET /api/oauth/usage` returns **429** (rate-limited) where a fabricated path under the same prefix returns **404**. The path is real — and that 429 is a preview of its temperament.
 
-**It rate-limits aggressively.** robinebers/openusage, the most-used client,
-says so in a code comment and implements a hard 5-minute lockout after a 429,
-during which it makes no call at all and serves the last good values with a
-staleness note. Its own user-facing copy reads: *"Updates blocked by Anthropic.
-Be patient — manual refreshes will make it worse."* Its refresh cadence is a
-fixed 5 minutes with no setting to change it.
+**It rate-limits aggressively.** robinebers/openusage, the most-used client, says so in a code comment and implements a hard 5-minute lockout after a 429, during which it makes no call at all and serves the last good values with a staleness note. Its own user-facing copy reads: *"Updates blocked by Anthropic. Be patient — manual refreshes will make it worse."* Its refresh cadence is a fixed 5 minutes with no setting to change it.
 
-**Open risk — token scope.** That client states an inference-only token from
-`claude setup-token` authenticates but cannot read usage; it wants
-`user:profile`. Other research puts `user:profile` in the setup-token scope
-list. Unresolved and account-specific. Test before building on it:
+**Open risk — token scope.** That client states an inference-only token from `claude setup-token` authenticates but cannot read usage; it wants `user:profile`. Other research puts `user:profile` in the setup-token scope list. Unresolved and account-specific. Test before building on it:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' https://api.anthropic.com/api/oauth/usage \
   -H "Authorization: Bearer $YOUR_OAT_TOKEN" -H "anthropic-beta: oauth-2025-04-20"
 ```
 
-200 means the endpoint is available to this project. 401 or 403 means phase 1's
-header probe stays the only route.
+200 means the endpoint is available to this project. 401 or 403 means phase 1's header probe stays the only route.
 
 ---
 
@@ -66,9 +46,7 @@ header probe stays the only route.
 
 ### The unified family (OBSERVED, undocumented)
 
-Sixteen headers, all prefixed `anthropic-ratelimit-unified-`. Phase 1 reads
-four. Evidence: Claude Code's own `MockHeaders` type in a community source
-mirror, corroborated by a 37,363-request proxy capture on a Max account.
+Sixteen headers, all prefixed `anthropic-ratelimit-unified-`. Phase 1 reads four. Evidence: Claude Code's own `MockHeaders` type in a community source mirror, corroborated by a 37,363-request proxy capture on a Max account.
 
 | Suffix | Values / format | Notes |
 |---|---|---|
@@ -84,20 +62,13 @@ mirror, corroborated by a 37,363-request proxy capture on a Max account.
 | `overage-utilization` / `overage-reset` / `overage-surpassed-threshold` | | |
 | `overage-disabled-reason` | 13-value enum | Why extra usage is unavailable |
 
-**There is no Opus-specific utilization header.** `seven_day_opus` exists only
-as a *value* of `representative-claim`. The number lives on the JSON endpoint
-only. If an Opus gauge is wanted, that decides the endpoint question.
+**There is no Opus-specific utilization header.** `seven_day_opus` exists only as a *value* of `representative-claim`. The number lives on the JSON endpoint only. If an Opus gauge is wanted, that decides the endpoint question.
 
 ### The documented family (DOCUMENTED)
 
-`anthropic-ratelimit-requests-*`, `-tokens-*`, `-input-tokens-*`,
-`-output-tokens-*`, each with `-limit` / `-remaining` / `-reset`. Plus
-`retry-after` and `request-id`.
+`anthropic-ratelimit-requests-*`, `-tokens-*`, `-input-tokens-*`, `-output-tokens-*`, each with `-limit` / `-remaining` / `-reset`. Plus `retry-after` and `request-id`.
 
-These are organization and API-key-tier oriented. **Note the format difference:**
-documented `*-reset` headers are RFC 3339 strings, while the unified `*-reset`
-headers are epoch seconds. Whether both families appear together on a
-subscription OAuth token is UNVERIFIED — no capture shows both.
+These are organization and API-key-tier oriented. **Note the format difference:** documented `*-reset` headers are RFC 3339 strings, while the unified `*-reset` headers are epoch seconds. Whether both families appear together on a subscription OAuth token is UNVERIFIED — no capture shows both.
 
 ---
 
@@ -109,8 +80,7 @@ Authorization: Bearer sk-ant-oat01-...
 anthropic-beta: oauth-2025-04-20
 ```
 
-No `anthropic-version` header is sent by any of the six implementations found.
-POST returns 405.
+No `anthropic-version` header is sent by any of the six implementations found. POST returns 405.
 
 A captured response, March 2026:
 
@@ -126,44 +96,23 @@ A captured response, March 2026:
 }
 ```
 
-**Both windows and `utilization` can be `null`**, independently. One project
-records that typing `utilization` as non-nullable turned a single null into a
-whole-response parse failure. Any parser here must tolerate both.
+**Both windows and `utilization` can be `null`**, independently. One project records that typing `utilization` as non-nullable turned a single null into a whole-response parse failure. Any parser here must tolerate both.
 
-**The flat per-model keys are dead.** `seven_day_opus` and `seven_day_sonnet`
-now return `null`; Anthropic moved per-model weekly windows into a `limits[]`
-array as `weekly_scoped` rows keyed by `scope.model.display_name`. This is
-confirmed by robinebers/openusage, whose Fable meter reads exactly that path
-and whose commit message documents the migration.
+**The flat per-model keys are dead.** `seven_day_opus` and `seven_day_sonnet` now return `null`; Anthropic moved per-model weekly windows into a `limits[]` array as `weekly_scoped` rows keyed by `scope.model.display_name`. This is confirmed by robinebers/openusage, whose Fable meter reads exactly that path and whose commit message documents the migration.
 
-**Do not hard-code model names.** Iterate `limits[]`, take every entry with
-`kind == "weekly_scoped"`, and read `scope.model.display_name` and `percent`.
-That is forward-compatible with Opus, Sonnet, Haiku, Fable, Cowork, or whatever
-ships next. A client that hard-codes `seven_day_opus` renders nothing today.
+**Do not hard-code model names.** Iterate `limits[]`, take every entry with `kind == "weekly_scoped"`, and read `scope.model.display_name` and `percent`. That is forward-compatible with Opus, Sonnet, Haiku, Fable, Cowork, or whatever ships next. A client that hard-codes `seven_day_opus` renders nothing today.
 
-The `limits[]` array was captured in July 2026. Each entry carries
-`kind` (`session` | `weekly_all` | `weekly_scoped`), `scope.model.display_name`,
-`percent`, `severity`, `resets_at`, and `is_active` — the last marking the
-binding limit. Only one of the six projects reads it; the rest still read the
-flat keys. **The schema is actively moving.** Two projects deliberately parse
-unknown keys rather than enumerate them, and captures contain unreleased
-codename slots (`tangelo`, `iguana_necktie`, `nimbus_quill`, `cinder_cove`,
-`amber_ladder`). Anything built here should ignore what it does not recognise
-rather than fail.
+The `limits[]` array was captured in July 2026. Each entry carries `kind` (`session` | `weekly_all` | `weekly_scoped`), `scope.model.display_name`, `percent`, `severity`, `resets_at`, and `is_active` — the last marking the binding limit. Only one of the six projects reads it; the rest still read the flat keys. **The schema is actively moving.** Two projects deliberately parse unknown keys rather than enumerate them, and captures contain unreleased codename slots (`tangelo`, `iguana_necktie`, `nimbus_quill`, `cinder_cove`, `amber_ladder`). Anything built here should ignore what it does not recognise rather than fail.
 
 ### Sibling: `GET /api/oauth/profile` (OBSERVED)
 
-Same auth. Returns `account.{full_name, email, has_claude_max, has_claude_pro}`
-and `organization.{name, rate_limit_tier, subscription_status,
-has_extra_usage_enabled}`. Would let the device name the plan it is watching, or
-warn when a subscription lapses.
+Same auth. Returns `account.{full_name, email, has_claude_max, has_claude_pro}` and `organization.{name, rate_limit_tier, subscription_status, has_extra_usage_enabled}`. Would let the device name the plan it is watching, or warn when a subscription lapses.
 
 ---
 
 ## Surface 3 — status.claude.com (DOCUMENTED format, verified live here)
 
-Standard Atlassian Statuspage v2. **No authentication.** All endpoints verified
-returning 200 from this machine on 2026-09-05.
+Standard Atlassian Statuspage v2. **No authentication.** All endpoints verified returning 200 from this machine on 2026-09-05.
 
 `/api/v2/status.json` is the cheapest poll on offer at ~212 bytes:
 
@@ -171,11 +120,7 @@ returning 200 from this machine on 2026-09-05.
 {"page":{...},"status":{"indicator":"none","description":"All Systems Operational"}}
 ```
 
-`indicator` ∈ `none` | `minor` | `major` | `critical` | `maintenance`.
-`/api/v2/components.json` (~2 KB) breaks it down; the two components that matter
-here are **Claude API (api.anthropic.com)** and **Claude Code**.
-`/api/v2/incidents/unresolved.json` (~157 B when clear) carries `impact` ∈
-`none` | `minor` | `major` | `critical`.
+`indicator` ∈ `none` | `minor` | `major` | `critical` | `maintenance`. `/api/v2/components.json` (~2 KB) breaks it down; the two components that matter here are **Claude API (api.anthropic.com)** and **Claude Code**. `/api/v2/incidents/unresolved.json` (~157 B when clear) carries `impact` ∈ `none` | `minor` | `major` | `critical`.
 
 Only `operational` / `none` were observed live, because everything was green.
 
@@ -194,30 +139,23 @@ Only `operational` / `none` were observed live, because everything was green.
 | 500 / 504 | Anthropic-side error | Retry with backoff |
 | 529 | Overloaded — "high traffic across all users" | "Anthropic busy", explicitly not the user's fault |
 
-The 200-without-headers case is the one most likely to be misread as a bug.
-Phase 1 already reports it as `no_usage_h_200`, which is correct but cryptic.
+The 200-without-headers case is the one most likely to be misread as a bug. Phase 1 already reports it as `no_usage_h_200`, which is correct but cryptic.
 
 ---
 
 ## The local-files boundary
 
-A standalone device can never show these, because no server has them. They are
-computed by walking `~/.claude/projects/**/*.jsonl` (plus pi and Cowork session
-directories) and multiplying token counts by a pricing table downloaded
-hourly from GitHub Pages, LiteLLM and models.dev:
+A standalone device can never show these, because no server has them. They are computed by walking `~/.claude/projects/**/*.jsonl` (plus pi and Cowork session directories) and multiplying token counts by a pricing table downloaded hourly from GitHub Pages, LiteLLM and models.dev:
 
 - Tokens used today, yesterday, last 30 days
 - Dollars for the same periods — **estimated, not measured.** Token counts are
-  real; the money is arithmetic
+real; the money is arithmetic
 - The usage trend graph (31 daily bars of tokens/day)
 - Per-model spend breakdown
 
-There is no Anthropic endpoint behind any of it. This is a hard boundary on
-what Usage-Chan can ever be, and it is worth knowing before designing toward a
-number that cannot arrive.
+There is no Anthropic endpoint behind any of it. This is a hard boundary on what Usage-Chan can ever be, and it is worth knowing before designing toward a number that cannot arrive.
 
-Also local, perhaps surprisingly: the **plan name** ("Max 20x") comes from the
-credential blob, not the API.
+Also local, perhaps surprisingly: the **plan name** ("Max 20x") comes from the credential blob, not the API.
 
 ## What is NOT available
 
@@ -225,17 +163,11 @@ credential blob, not the API.
 
 > The Admin API is unavailable for individual accounts.
 
-It needs an Admin API key, an OAuth token with `org:admin` scope, or an
-unscoped personal/service key. A `claude setup-token` token carries
-`user:profile user:inference user:sessions:claude_code user:mcp_servers
-user:file_upload` — none of them. Separately, no evidence was found that those
-reports cover consumer Max-plan usage at all; they report Console API usage.
+It needs an Admin API key, an OAuth token with `org:admin` scope, or an unscoped personal/service key. A `claude setup-token` token carries `user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload` — none of them. Separately, no evidence was found that those reports cover consumer Max-plan usage at all; they report Console API usage.
 
 This confirms plan.md's existing call to keep dollar spend out of scope.
 
-**claude.ai's own usage endpoints** need a browser `sessionKey` cookie, not an
-OAuth token. ClaudeGauge ships a Chrome extension purely to extract that cookie.
-A more fragile path, not recommended.
+**claude.ai's own usage endpoints** need a browser `sessionKey` cookie, not an OAuth token. ClaudeGauge ships a Chrome extension purely to extract that cookie. A more fragile path, not recommended.
 
 ---
 
@@ -243,40 +175,27 @@ A more fragile path, not recommended.
 
 Worth stating plainly rather than burying.
 
-Anthropic's consumer terms prohibit, except when using an API key or where
-otherwise permitted, accessing the Services
+Anthropic's consumer terms prohibit, except when using an API key or where otherwise permitted, accessing the Services
 
 > through automated or non-human means, whether through a bot, script, or otherwise.
 
-Against that: `claude setup-token` is Anthropic's own command, and its documented
-purpose is producing a token for automated and CI use. Half a dozen public
-projects poll these surfaces openly.
+Against that: `claude setup-token` is Anthropic's own command, and its documented purpose is producing a token for automated and CI use. Half a dozen public projects poll these surfaces openly.
 
-Also on the record: in February 2026, users reported `sk-ant-oat01-` tokens
-being rejected outright with "OAuth authentication is currently not supported."
-That block does not appear to have persisted, and Anthropic never answered the
-issue. A claim circulates that consumer OAuth is "intended exclusively for
-Claude Code and Claude.ai", but that quote **could not be verified at its
-claimed source**.
+Also on the record: in February 2026, users reported `sk-ant-oat01-` tokens being rejected outright with "OAuth authentication is currently not supported." That block does not appear to have persisted, and Anthropic never answered the issue. A claim circulates that consumer OAuth is "intended exclusively for Claude Code and Claude.ai", but that quote **could not be verified at its claimed source**.
 
-Unresolved, and not resolvable from here. The practical read: this is a device
-polling a personal account a few times an hour, which is modest. But the risk
-is a personal account, and it is the account owner's call — and it argues for
-polling *less*, not more, which happens to align with the JSON endpoint being
-free.
+Unresolved, and not resolvable from here. The practical read: this is a device polling a personal account a few times an hour, which is modest. But the risk is a personal account, and it is the account owner's call — and it argues for polling *less*, not more, which happens to align with the JSON endpoint being free.
 
 ---
 
 ## Could not verify
 
 1. Utilization scale on `/api/oauth/usage`. Three sources say 0–100 and a
-   captured payload agrees, but nobody has measured it on *this* account.
+captured payload agrees, but nobody has measured it on *this* account.
 2. Whether documented and unified header families co-occur.
 3. `anthropic-ratelimit-unified-5h-status` — read by Clawdmeter, absent from
-   both Claude Code's own type and the 37k capture. Probably does not exist.
+both Claude Code's own type and the 37k capture. Probably does not exist.
 4. Whether `/v1/models` returns 200 with an OAuth token. Several shipped CLIs
-   implement it that way, and one dated live probe reports 200, but no captured
-   response was found.
+implement it that way, and one dated live probe reports 200, but no captured response was found.
 5. Whether unified headers appear on 429 and 5xx responses.
 6. Whether 529 carries `retry-after`.
 7. The server-side rule for emitting `*-surpassed-threshold`.

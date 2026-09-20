@@ -16,9 +16,9 @@ The dashboard is **vertical**: two bottom-anchored columns, a thin one for the 7
 
 Three things landed on 2026-09-20 that change what happens next. The overage headers arrive on *ordinary* responses, so "in overage" is `unified-status: rejected`, not the presence of a header — that bug is fixed. The first header set seen past the wall now pins itself to NVS and prints at every boot, so the capture no longer needs a console attached at the moment it happens. And a live header set says `overage-reset` is **2026-10-01 00:00 UTC** — the first of the month. The extra-usage allowance is a monthly billing window sharing no edge with either window the dashboard draws, which means the diamond is in the wrong place on the overage bar.
 
-The control column is real. Menu bars at the top, a four-state signal glyph in the middle, and a refresh indicator at the bottom that counts down to the next attempt, spins while one is running, and shows a struck-out circle for five seconds after one fails. The top glyph is the dashboard's only touch target. A failed attempt marks the circle for five seconds and leaves the countdown warn-coloured until something succeeds. Two treatments are still undecided — spinner bars or dots, ghosted or absent signal bands — and both are in `explore.html` section 7.
+The control column is real. Menu bars at the top, a four-state signal glyph in the middle, and a refresh indicator at the bottom that counts down to the next attempt, spins while one is running, and shows a struck-out circle for five seconds after one fails. The top glyph is the dashboard's only touch target. The PIN screen is a keypad now: four taps instead of up to 36, which matters because every flash is a reboot and every reboot is a PIN. A failed refresh attempt marks the circle for five seconds and leaves the countdown warn-coloured until something succeeds. Two treatments are still undecided — spinner bars or dots, ghosted or absent signal bands — and both are in `explore.html` section 7.
 
-The pictures now come from `design/icons/*.png` through `tools/icons2c.py` rather than from geometry fitted by hand, so changing one is an export and a command.
+The pictures now come from `design/icons/*.png` rather than from geometry fitted by hand. `tools/fetch-icons.sh` pulls them from Figma and regenerates everything in one command, given a Figma token in the environment.
 
 Nothing is blocked. The next few moves are small and listed below.
 
@@ -28,13 +28,13 @@ Nothing is blocked. The next few moves are small and listed below.
 
 ### Next up
 
-- **Tune the control column.** The glyphs are on the device and the colour is one constant, `C_CTRL`. Decide bars or dots, ghosted or absent, and how far down `C_CTRL` should go.
-- **Decide what colour a failure is.** The countdown after a failure is warn-coloured now, but the mark and the spinner still draw in `C_CTRL` — so the announcement is quieter than the condition it announces. One constant either way.
-- **Confirm the `[CAP]` line with your own eyes.** The dump fix is flashed and the device is running it, but the block prints in the first two seconds of boot and nothing remote can read that window (see the settled entry below). `pio device monitor -e stackchan`, then press reset.
-- **Fix the diamond on the overage bar.** It is placed by the base window's elapsed fraction, and the bar underneath it is filling against a month. Either derive the monthly elapsed fraction (the reset is the first of the month, so the start is the first of the previous one) or retire the diamond while overage is drawing.
-- **Decide the sub-12% headline word.** `nearly out` is 116px in a 102px slot. `explore.html` section 5 offers `very low` (96px), `low` (40px), or keeping the number.
-- **Decide what to do about `tools/readboot.py`.** Run now, and it does not do the job it was written for — it reaches `[HAL]` and stops. Docstring rewritten to say so. Keep it for early-boot problems, or delete it.
-- Optional cleanup: `drawWindowBar`, `drawSevenDayBar` and `drawPaceCaption` are defined in `ui.cpp` and never called — about 140 lines of dead code.
+- [ ] **Tune the control column.** The glyphs are on the device and the colour is one constant, `C_CTRL`. Decide bars or dots, ghosted or absent, and how far down `C_CTRL` should go.
+- [ ] **Decide what colour a failure is.** The countdown after a failure is warn-coloured now, but the mark and the spinner still draw in `C_CTRL` — so the announcement is quieter than the condition it announces. One constant either way.
+- [ ] **Confirm the `[CAP]` line with your own eyes.** The dump fix is flashed and the device is running it, but the block prints in the first two seconds of boot and nothing remote can read that window (see the settled entry below). `pio device monitor -e stackchan`, then press reset.
+- [ ] **Fix the diamond on the overage bar.** It is placed by the base window's elapsed fraction, and the bar underneath it is filling against a month. Either derive the monthly elapsed fraction (the reset is the first of the month, so the start is the first of the previous one) or retire the diamond while overage is drawing.
+- [ ] **Decide the sub-12% headline word.** `nearly out` is 116px in a 102px slot. `explore.html` section 5 offers `very low` (96px), `low` (40px), or keeping the number.
+- [ ] **Decide what to do about `tools/readboot.py`.** Run now, and it does not do the job it was written for — it reaches `[HAL]` and stops. Docstring rewritten to say so. Keep it for early-boot problems, or delete it.
+- [ ] Optional cleanup: `drawWindowBar`, `drawSevenDayBar` and `drawPaceCaption` are defined in `ui.cpp` and never called — about 140 lines of dead code.
 
 ### Phase 1.5 – make it livable
 
@@ -42,10 +42,10 @@ Phase 1 works but is awkward to live with. Everything here is about the parts yo
 
 It has grown into four tracks. They are listed in build order, and the ordering is mostly forced by dependency rather than preference.
 
-- Track A, on-device polish – refresh clock · menu with statuses and legend · PIN screen rework · timezone. Depends on nothing; in progress.
-- Track B, setup, the cheap half – QR to join the AP · "copy your token first" warning · drop claude-usage-stick branding from reworked screens. Depends on nothing.
-- Track C, LAN panel – settings, token replacement, PIN in a browser, and deferred token entry, which is the expensive half of setup. Depends on nothing, but it is the big one.
-- Track D, follow-ons – OTA · Claude service status · currency symbol. Depends on C for OTA; status wants its own fetch path.
+- [ ] Track A, on-device polish – refresh clock ✓ · menu with statuses and legend · PIN screen rework ✓ · timezone. Depends on nothing; in progress.
+- [ ] Track B, setup, the cheap half – QR to join the AP · "copy your token first" warning · drop claude-usage-stick branding from reworked screens. Depends on nothing.
+- [ ] Track C, LAN panel – settings, token replacement, PIN in a browser, and deferred token entry, which is the expensive half of setup. Depends on nothing, but it is the big one.
+- [ ] Track D, follow-ons – OTA · Claude service status · currency symbol. Depends on C for OTA; status wants its own fetch path.
 
 **Where the setup rework sits, since it keeps getting asked:** split across B and C. The cheap half is B and needs nothing — a QR code to join the network, and one sentence telling you to copy your token before you leave the internet. The expensive half is *asking for the token after the device is on your WiFi*, and that is really the LAN panel wearing a different hat, so it lands with C.
 
@@ -89,17 +89,17 @@ Four things went wrong in practice, in order of severity:
 Fix 3 is largely solved by the panel (type the PIN in a browser), and fully solved by an on-screen keypad — see parked ideas.
 
 ### Phase 2 (optional) – Stack-Chan's own capabilities
-- Swap the plain bars for a face through M5Stack-Avatar, expression driven by five-hour utilization and burn rate
-- Consider the servo neck – a droop as the budget depletes. Servos are on a rail gated by the PY32 expander that phase 1 leaves off; StackChan-BSP's `setServoPowerEnabled()` is how it comes on
-- The 12 RGB LEDs are a second display surface and cost almost nothing — a single ambient colour for 5h utilization, readable from across the room with the screen dark
-- Worth doing once phase one has run clean for a while, not before
+- [ ] Swap the plain bars for a face through M5Stack-Avatar, expression driven by five-hour utilization and burn rate
+- [ ] Consider the servo neck – a droop as the budget depletes. Servos are on a rail gated by the PY32 expander that phase 1 leaves off; StackChan-BSP's `setServoPowerEnabled()` is how it comes on
+- [ ] The 12 RGB LEDs are a second display surface and cost almost nothing — a single ambient colour for 5h utilization, readable from across the room with the screen dark
+- [ ] Worth doing once phase one has run clean for a while, not before
 
 ### Phase 3 – exceed
-- Model health mascots pulled from status.claude.com, Mango's approach – public endpoint, no token, cheap to add
-- Reuse Clawdmeter's mood algorithm (rate of change over a five-minute window) once phase two's face exists – not its art or fonts, which its own README flags as a licensing gray area
-- Multiple screens cycled by button, ClaudeGauge-style, if one screen stops being enough
-- **Voice.** CoreS3 has a mic and speaker, and M5Unified exposes both — no BSP needed. Realistic shape is record → ship audio to a service → play the answer, not on-device wake word plus STT. That is a much larger project than phase 1 and pulls in an API key, a second endpoint, and a real audio task. Design constraints it imposes are already honoured (see the decision log)
-- Explicitly out of scope: dollar spend and Claude Code git or session analytics. That data lives in local logs and git history on the Mac, not anywhere the ESP32 can reach on its own – it would need a host relay like Clawdmeter's, which phase one deliberately avoids
+- [ ] Model health mascots pulled from status.claude.com, Mango's approach – public endpoint, no token, cheap to add
+- [ ] Reuse Clawdmeter's mood algorithm (rate of change over a five-minute window) once phase two's face exists – not its art or fonts, which its own README flags as a licensing gray area
+- [ ] Multiple screens cycled by button, ClaudeGauge-style, if one screen stops being enough
+- [ ] **Voice.** CoreS3 has a mic and speaker, and M5Unified exposes both — no BSP needed. Realistic shape is record → ship audio to a service → play the answer, not on-device wake word plus STT. That is a much larger project than phase 1 and pulls in an API key, a second endpoint, and a real audio task. Design constraints it imposes are already honoured (see the decision log)
+- [ ] Explicitly out of scope: dollar spend and Claude Code git or session analytics. That data lives in local logs and git history on the Mac, not anywhere the ESP32 can reach on its own – it would need a host relay like Clawdmeter's, which phase one deliberately avoids
 
 ### Stubs and IOUs
 
@@ -179,7 +179,7 @@ The key is the interesting one: a legend for a display that deliberately has no 
 
 - **Ease the token handoff.** Joining the setup AP drops your phone or laptop off the internet, so the token has to be already copied before you switch networks. A QR code on the device pointing at `http://192.168.4.1`, and a note on the setup page telling you to copy the token first, would cover most of the pain
 - **Use `M5.BtnPWR`.** A real physical input sitting unused. "Refresh now" fits it, and would free the middle touch zone
-- **A real PIN keypad.** Four digits at one-tap-per-increment is up to 36 taps. A 320x240 touchscreen can show ten targets; it just needs raw touch coordinates rather than the three-button abstraction
+- **A real PIN keypad.** ~~Four digits at one-tap-per-increment is up to 36 taps.~~ Built 2026-09-20; see the decision log.
 - **Token expiry.** `claude setup-token` tokens last a year. Largely solved by the panel's token replacement; a countdown from a stored issue date would still warn before the device simply stops
 - **Sleep or dim on a schedule.** A lit 320x240 panel on a nightstand at 2am is a lot
 - **Respond to ambient light.** The CoreS3 carries an LTR-553 light and proximity sensor on its front panel, and M5Unified may already expose it. Auto-brightness would answer the schedule item above and the "dimmest dot is still too dim / too bright" tuning at once. Fancy, so it belongs to a polish pass, and it is unverified whether the Stack-Chan shell leaves the sensor uncovered
@@ -202,6 +202,11 @@ The key is the interesting one: a legend for a display that deliberately has no 
 ## Settled
 
 Decisions as they were made, newest first, so the reasoning survives the session. Display decisions live in `docs/design-decisions.md`; this log is the project-level ones.
+
+### 2026-09-20 — A real PIN keypad
+Ten targets instead of one. Up to 36 taps became four. The old screen dialled each digit with BtnA/BtnB, which was fine when the device booted once and is not fine when every flash is a reboot and every reboot is a PIN. Parked since 2026-09-04; unparked because the cost finally landed on the person building it.
+
+96x46 keys, three across and four down, no confirm key — the fourth digit submits. Four dots fill as digits land and no digit is ever shown; the old screen only showed one because a +1 button gave you no other way to know what you were dialling.
 
 ### 2026-09-20 — Icons are exported, not translated
 `tools/icons2c.py` turns the PNGs in `design/icons/` into `src/icons.h` and `docs/sim/icons.js` from one set of bits. Eight icons, 1024 bytes of flash. `tools/verify-icons.js` renders a real dashboard and compares the control column against the exported PNGs: zero differing pixels, against 1-2% for every icon that was fitted by hand.

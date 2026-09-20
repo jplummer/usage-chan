@@ -17,9 +17,14 @@ void uiBootProgress(int percent, const char* label);
 void uiSetupScreen(const char* apName, const char* apPass, bool reconfigure = false);
 void uiConnecting(const char* ssid, int attempt = 0);
 
-// PIN entry. pos is the digit being edited (0..3); digits holds the current
-// values, including the ones not yet confirmed.
-void uiPinScreen(int pos, const int digits[4]);
+// PIN entry, on a keypad. `entered` is how many digits are in (0..4) and
+// `pressed` is the key currently under a finger, or -1 for none.
+void uiPinScreen(int entered, int pressed = -1);
+
+// The key at a touch point: 0-9 for a digit, UI_PIN_DEL for backspace, or -1
+// for a gap between keys.
+#define UI_PIN_DEL 10
+int uiPinKeyAt(int x, int y);
 void uiLockoutStatic(int attempts, int maxAttempts, int lockoutSec);
 void uiLockoutTick(int secondsLeft);
 

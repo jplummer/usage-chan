@@ -133,8 +133,8 @@
   for (const [mn, fn] of MENUS) for (const f of ['Font2', 'cand'])
     menuCells.push({ c: cell($('menugrid'), mn), f, fn, t: mn });
   for (const f of ['Font2', 'cand']) {
-    pinCells.push({ c: cell($('pingrid'), 'boxes + button strip (shipped)'), fn: SCREENS.pin, f });
-    pinCells.push({ c: cell($('pingrid'), 'keypad'), fn: VARIANTS.pinKeypad, f });
+    pinCells.push({ c: cell($('pingrid'), 'keypad (shipped)'), fn: SCREENS.pin, f });
+    pinCells.push({ c: cell($('pingrid'), 'keypad, first sketch'), fn: VARIANTS.pinKeypad, f });
   }
   const INTS = [['boot', SCREENS.boot], ['setup', SCREENS.setup], ['connecting', SCREENS.connecting],
                 ['lockout', SCREENS.lockout], ['error', SCREENS.error]];
