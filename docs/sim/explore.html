@@ -221,6 +221,54 @@
     </div>
   </section>
 
+  <section>
+    <div class="stage">
+      <h2>7 &middot; The control column, and how loud it should be</h2>
+      <p>The three circles started as solid discs standing in for icons, and
+      they read as three lamps &mdash; the brightest thing on a screen whose
+      whole job is a number and a bar. Drawing the real glyphs takes about
+      five-sixths of that ink away by itself. What is left is a set of choices
+      that are easier to look at than to argue about, which is what this
+      section is for.</p>
+      <p><strong>The spinner.</strong> Bars and dots use the same eight
+      positions and the same moving gap. The dots carry slightly more ink
+      &mdash; about 196 lit pixels against 143 &mdash; and far fewer edges.
+      Which one is quieter in the corner of your eye is not something a count
+      settles.</p>
+      <p><strong>Signal strength.</strong> Ghosted keeps the whole figure at
+      every level, outlining the bands the signal doesn't reach, so strength
+      reads as how much of one shape is solid and the scale is on screen every
+      time you look. Absent draws only the bands you have, which is how every
+      phone does it: quieter, and quietest exactly when the news is worst. That
+      inversion used to be an argument against it. It isn't any more, because
+      the alarm moved &mdash; a link too weak to fetch through now shows as a
+      failed refresh on the circle below, which says the thing you actually
+      care about instead of a proxy for it. No-link keeps the full ghosted
+      figure either way: a strike through nothing says nothing.</p>
+      <p><strong>Failure.</strong> The circle goes solid with an X taken out of
+      it &mdash; the loudest mark in the column, for the only thing there that
+      is bad news. It holds for five seconds and then gives way to the countdown
+      to the retry. Worth noticing what that means: a device failing every poll
+      shows the X for five seconds in every three hundred and looks healthy for
+      the rest, which is the stale-reading-that-looks-fresh failure this project
+      exists to avoid. The five seconds are the announcement; the standing
+      condition still needs somewhere to live.</p>
+      <div class="grid" id="ctrlzoom"></div>
+    </div>
+    <div class="controls">
+      <div class="ctl"><label>signal</label>
+        <div class="seg" id="ctrlrssi">
+          <button data-v="-50" aria-pressed="true">hi</button>
+          <button data-v="-65">med</button>
+          <button data-v="-80">lo</button>
+          <button data-v="0">none</button></div></div>
+      <div class="ctl"><label>step <span id="ctrlstepv">1</span></label>
+        <input type="range" id="ctrlstep" min="0" max="7" value="1"></div>
+      <div class="ctl"><label>through the interval <span id="ctrlfracv">62%</span></label>
+        <input type="range" id="ctrlfrac" min="0" max="100" value="62"></div>
+    </div>
+  </section>
+
   <section class="notes">
     <h2>Reading this page</h2>
     <dl>
@@ -315,6 +363,16 @@
     ['fetching', { fetching: true, spinPhase: 1 }],
   ].map(([t, st]) => refCell($('refgrid'), t, st));
 
+  const CTRL_ZOOM = [
+    ['menu', V.V_CIRCLE_Y0, st => st],
+    ['signal &middot; ghosted', V.V_CIRCLE_Y1, st => Object.assign({}, st, { wifiGhost: true })],
+    ['signal &middot; absent', V.V_CIRCLE_Y1, st => Object.assign({}, st, { wifiGhost: false })],
+    ['countdown', V.V_CIRCLE_Y2, st => st],
+    ['spinner &middot; bars', V.V_CIRCLE_Y2, st => Object.assign({}, st, { fetching: true, spinner: 'bars' })],
+    ['spinner &middot; dots', V.V_CIRCLE_Y2, st => Object.assign({}, st, { fetching: true, spinner: 'dots' })],
+    ['refresh failed', V.V_CIRCLE_Y2, st => Object.assign({}, st, { refreshFailed: true })],
+  ].map(([t, cy, fn]) => { const c = refCell($('ctrlzoom'), t, null); c.cy = cy; c.fn = fn; return c; });
+
   const LADDER = [
     ['shipped — headline swaps to the clock', SCREENS.dashboard],
     ['ladder — emphasis escalates in place', DASHVARIANTS.vLadder],
@@ -381,6 +439,21 @@
           crop.px[y * 40 + x] = g.px[(V.V_CIRCLE_Y2 - 4 + y) * 320 + (V.V_CTRL_X - 4 + x)];
       crop.blit(cell.c, 6);
     }
+    $('ctrlstepv').textContent = $('ctrlstep').value;
+    $('ctrlfracv').textContent = $('ctrlfrac').value + '%';
+    const ctrlBase = Object.assign({}, rs, {
+      rssi: +$('ctrlrssi').querySelector('[aria-pressed="true"]').dataset.v,
+      spinPhase: +$('ctrlstep').value,
+      pollFrac: $('ctrlfrac').value / 100,
+    });
+    for (const cell of CTRL_ZOOM) {
+      SCREENS.dashboard(g, T, cell.fn(ctrlBase));
+      for (let y = 0; y < 40; y++)
+        for (let x = 0; x < 40; x++)
+          crop.px[y * 40 + x] = g.px[(cell.cy - 4 + y) * 320 + (V.V_CTRL_X - 4 + x)];
+      crop.blit(cell.c, 6);
+    }
+
     for (const cell of REF_FULL) {
       SCREENS.dashboard(g, T, Object.assign({}, refBase, cell.st,
         cell.st.fetching ? {} : { pollFrac: $('refpos').value / 100 }));

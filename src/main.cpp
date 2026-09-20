@@ -251,7 +251,14 @@ void loop() {
         }
     }
 
-    if (millis() - g_lastFetchMs >= (unsigned long)g_settings.pollSec * 1000UL) {
+    // Schedule from the last ATTEMPT, not the last success. g_lastFetchMs only
+    // advances when a fetch works, so keying off it meant a failing device
+    // asked again on every pass of loop() -- against an endpoint the comments
+    // in fetcher.h are careful to say rate-limits hard. Found 2026-09-20 while
+    // building the indicator that would have shown it.
+    const unsigned long lastTry = fetcherLastAttemptMs();
+    if (!fetcherBusy() &&
+        (lastTry == 0 || millis() - lastTry >= (unsigned long)g_settings.pollSec * 1000UL)) {
         requestRefresh();
     }
 
@@ -260,8 +267,17 @@ void loop() {
     static unsigned long lastRedraw = 0;
     unsigned long interval = fetcherBusy() ? 300 : 1000;
     if (s_screen == SCREEN_DASH && millis() - lastRedraw > interval) {
-        uiDashboard(g_usage, g_lastFetchMs, WiFi.RSSI(), halBatPercent(),
-                    fetcherBusy(), g_settings.pollSec);
+        // A connected radio always reports a negative dBm, so 0 is the
+        // "no link" signal the wifi glyph reads. WiFi.RSSI() on a dropped
+        // connection is not reliably anything in particular.
+        // The ring counts down to the next attempt, so it is fed attempt time.
+        // The fail mark shows for a few seconds after an attempt that did not
+        // work, then gives way to that countdown.
+        const bool failed = fetcherLastError()[0] != '\0' && lastTry != 0 &&
+                            millis() - lastTry < UI_FAIL_HOLD_MS;
+        uiDashboard(g_usage, lastTry,
+                    WiFi.isConnected() ? WiFi.RSSI() : 0, halBatPercent(),
+                    fetcherBusy(), g_settings.pollSec, failed);
         lastRedraw = millis();
     }
 

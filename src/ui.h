@@ -23,10 +23,16 @@ void uiPinScreen(int pos, const int digits[4]);
 void uiLockoutStatic(int attempts, int maxAttempts, int lockoutSec);
 void uiLockoutTick(int secondsLeft);
 
-// The main screen. pollSec is the poll interval, which the refresh ring needs
-// to know how far through the wait it is; pass 0 to leave the ring empty.
-void uiDashboard(const UsageData& data, unsigned long lastFetchMs, int rssi,
-                 int batPct, bool fetching, int pollSec);
+// How long the failed-refresh mark holds the circle before the countdown to
+// the retry takes it back.
+#define UI_FAIL_HOLD_MS 5000UL
+
+// The main screen. lastAttemptMs is when the last fetch attempt finished --
+// attempt, not success, because the ring counts down to the next try. pollSec
+// is the poll interval; pass 0 to leave the ring empty. refreshFailed shows
+// the fail mark in place of the ring.
+void uiDashboard(const UsageData& data, unsigned long lastAttemptMs, int rssi,
+                 int batPct, bool fetching, int pollSec, bool refreshFailed);
 
 // Whether a dashboard touch landed on the menu button. The zone is larger
 // than the circle it draws -- see V_MENU_HIT_* in ui.cpp.

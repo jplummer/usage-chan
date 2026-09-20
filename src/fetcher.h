@@ -46,6 +46,13 @@ int32_t fetcherAgeSec();
 // are real but stale.
 const char* fetcherLastError();
 
+// millis() when the last attempt FINISHED, success or failure, or 0 if none
+// has. Distinct from fetcherSnapshot's lastGoodMs on purpose: freshness claims
+// key off success, but the retry schedule and the refresh indicator key off
+// attempts. Scheduling from the last good fetch means a failing device retries
+// on every pass of loop(), against an endpoint that rate-limits hard.
+unsigned long fetcherLastAttemptMs();
+
 // Milliseconds the last completed fetch took, or 0 if none has finished.
 // Kept because "how long does a refresh take?" deserved a measurement rather
 // than an estimate.

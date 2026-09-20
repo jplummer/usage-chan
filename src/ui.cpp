@@ -32,6 +32,11 @@ static void flush() {
 // Warm near-black rather than pure black: on an IPS panel in a lit room pure
 // black reads as a dead pixel field, and this thing sits on a desk all day.
 static uint16_t C_BG, C_CARD, C_TEXT, C_DIM, C_ACCENT, C_OK, C_WARN, C_CRIT, C_PAY;
+// The control column draws in its own colour rather than borrowing C_DIM.
+// It is chrome, not content -- it competes with the numbers for attention and
+// should lose. Kept separate so it can be taken down without dimming the pace
+// words, which say something.
+static uint16_t C_CTRL;
 
 static void initPalette() {
     C_BG     = lcd.color565(0x14, 0x11, 0x0F);
@@ -43,6 +48,7 @@ static void initPalette() {
     C_WARN   = lcd.color565(0xD9, 0xA4, 0x41);
     C_CRIT   = lcd.color565(0xD9, 0x56, 0x4F);
     C_PAY    = lcd.color565(0x6E, 0x93, 0xC9);
+    C_CTRL   = C_DIM;
 }
 
 // Colour comes from the RELATIONSHIP between spend and elapsed time, not from
@@ -356,6 +362,21 @@ static constexpr int V_CIRCLE_D    = 32;                 // the frames say 32, n
 static constexpr int   V_SPOKES   = 8;
 static constexpr float V_SPOKE_R0 = 6.0f, V_SPOKE_R1 = 16.0f;
 static constexpr float V_SPOKE_HW = 1.0f;                // half of 2px
+// The other spinner: eight dots on a ring, same eight positions, same gap.
+static constexpr float V_DOT_RING = 12.8f, V_DOT_R = 2.9f;
+// Refresh failed: the circle filled, with an X taken back out of it.
+static constexpr float V_FAIL_ARM = 8.6f, V_FAIL_T = 2.0f;
+
+// The menu glyph: three bars, from the frame.
+static constexpr int V_MENU_BAR_X = 4, V_MENU_BAR_W = 24, V_MENU_BAR_H = 2;
+static constexpr int V_MENU_BAR_Y[3] = { 5, 15, 25 };
+
+// The wifi glyph: three concentric wedges about a centre below the box, each
+// spanning 45 degrees either side of straight up. Radii measured off the
+// frame's ellipses. Index 0 is the dot, 2 the outermost arc.
+static constexpr float V_WIFI_CX = 16.03f, V_WIFI_CY = 28.5f;
+static constexpr float V_WIFI_R[3][2] = { { 0.0f, 5.11f }, { 7.76f, 13.955f }, { 16.61f, 22.8f } };
+static constexpr int   V_WIFI_STRIKE[4] = { 27, 4, 5, 26 };   // x0, y0, x1, y1
 
 // The menu button's touch zone, which is deliberately bigger than the circle
 // it belongs to. 32px is about 5mm on this panel and the reliable floor is
@@ -437,6 +458,44 @@ static void ctrlWedge(int y, float frac, uint16_t col) {
         }
 }
 
+// The same eight positions as the spokes, drawn as dots. Fewer edges for the
+// eye to catch on; slightly more ink. Which of the two is quieter is a looking
+// question, not an arguing one -- explore.html puts them side by side.
+static void ctrlDots(int y, int gap, uint16_t col) {
+    for (int k = 0; k < V_SPOKES; k++) {
+        if (k == gap) continue;
+        const float a  = k * (2.0f * (float)M_PI / V_SPOKES);
+        const float cx = V_CIRCLE_R + V_DOT_RING * sinf(a);
+        const float cy = V_CIRCLE_R - V_DOT_RING * cosf(a);
+        for (int py = 0; py < V_CIRCLE_D; py++)
+            for (int px = 0; px < V_CIRCLE_D; px++) {
+                const float dx = px + 0.5f - cx, dy = py + 0.5f - cy;
+                if (dx * dx + dy * dy <= V_DOT_R * V_DOT_R)
+                    g->drawPixel(V_CTRL_X + px, y + py, col);
+            }
+    }
+}
+
+// The refresh failed: the circle goes solid and an X is taken back out of it.
+// The loudest mark in the column, which is right -- it is the only thing there
+// that is bad news. Same X as the blocked-overage token, so a cross means the
+// same thing wherever it turns up.
+static void ctrlFail(int y, uint16_t col) {
+    for (int py = 0; py < V_CIRCLE_D; py++)
+        for (int px = 0; px < V_CIRCLE_D; px++) {
+            const float dx = px + 0.5f - V_CIRCLE_R, dy = py + 0.5f - V_CIRCLE_R;
+            if (dx * dx + dy * dy > V_CIRCLE_R * V_CIRCLE_R) continue;
+            const float a = fabsf(dx + dy), b = fabsf(dx - dy);
+            if ((b <= V_FAIL_T && a <= V_FAIL_ARM * 2.0f) ||
+                (a <= V_FAIL_T && b <= V_FAIL_ARM * 2.0f)) continue;
+            g->drawPixel(V_CTRL_X + px, y + py, col);
+        }
+}
+
+// The bars spinner, kept beside the dots one it lost to. Not called: both
+// live in explore.html, and this is the one that has to build if the choice is
+// revisited on the device rather than only in the simulator.
+__attribute__((unused))
 // Eight spokes with one missing, the gap advancing a step per redraw. The
 // cheapest thing that reads as rotation, and the one the frame draws. Each
 // spoke is tested in its own rotated frame: distance along the spoke against
@@ -461,21 +520,97 @@ static void ctrlSpokes(int y, int gap, uint16_t col) {
         }
 }
 
+// ── The menu glyph ────────────────────────────────────────
+// Three bars. Nothing clever, and deliberately not a disc: the discs that
+// stood in for these read as three lamps and pulled the eye off the numbers,
+// which is the opposite of what a control column is for.
+static void drawMenuGlyph(int y, uint16_t col) {
+    for (int i = 0; i < 3; i++)
+        g->fillRect(V_CTRL_X + V_MENU_BAR_X, y + V_MENU_BAR_Y[i],
+                    V_MENU_BAR_W, V_MENU_BAR_H, col);
+}
+
+// ── The wifi glyph ────────────────────────────────────────
+// Three concentric wedges and a strike, all four states out of one shape. A
+// band is filled when the signal reaches it and outlined when it does not, so
+// strength reads as how much of the same figure is solid rather than as four
+// different pictures. level: 3 hi, 2 med, 1 lo, 0 no link.
+static bool wifiInBand(int b, int px, int py) {
+    const float dx = px + 0.5f - V_WIFI_CX, dy = py + 0.5f - V_WIFI_CY;
+    if (dy >= 0.0f) return false;                  // upper half only
+    if (fabsf(dx) > -dy) return false;             // 45 degrees either side
+    const float d = sqrtf(dx * dx + dy * dy);
+    return d >= V_WIFI_R[b][0] && d <= V_WIFI_R[b][1];
+}
+
+static void drawWifiGlyph(int y, int level, uint16_t col) {
+    for (int b = 0; b < 3; b++) {
+        const bool filled = level >= b + 1;
+        for (int py = 0; py < V_CIRCLE_D; py++)
+            for (int px = 0; px < V_CIRCLE_D; px++) {
+                if (!wifiInBand(b, px, py)) continue;
+                // An unfilled band shows as its own one-pixel edge: in the
+                // band, with a neighbour outside it.
+                if (!filled &&
+                    wifiInBand(b, px - 1, py) && wifiInBand(b, px + 1, py) &&
+                    wifiInBand(b, px, py - 1) && wifiInBand(b, px, py + 1)) continue;
+                g->drawPixel(V_CTRL_X + px, y + py, col);
+            }
+    }
+    if (level > 0) return;
+    // No link: a strike through the whole glyph, carrying a background-coloured
+    // gap either side so it reads as lying on top of the arcs rather than
+    // joining them. Same trick as the overage token's ring.
+    const int x0 = V_WIFI_STRIKE[0], y0 = V_WIFI_STRIKE[1];
+    const int x1 = V_WIFI_STRIKE[2], y1 = V_WIFI_STRIKE[3];
+    const int dx = x1 - x0 < 0 ? x0 - x1 : x1 - x0;
+    const int dy = y1 - y0 < 0 ? y0 - y1 : y1 - y0;
+    const int n  = dx > dy ? dx : dy;
+    for (int pass = 0; pass < 2; pass++) {
+        const uint16_t c = pass ? col : C_BG;
+        const int      w = pass ? 0 : 1;
+        for (int i = 0; i <= n; i++) {
+            const int sx = x0 + (x1 - x0) * i / n, sy = y0 + (y1 - y0) * i / n;
+            for (int oy = -w; oy <= w; oy++)
+                for (int ox = -w; ox <= w; ox++) {
+                    const int px = sx + ox, py = sy + oy;
+                    if (px < 0 || py < 0 || px >= V_CIRCLE_D || py >= V_CIRCLE_D) continue;
+                    g->drawPixel(V_CTRL_X + px, y + py, c);
+                }
+        }
+    }
+}
+
+// RSSI is a proxy for "will fetches work", and a coarse one -- see the open
+// note in design-decisions.md. Four buckets because the frame draws four. A
+// non-negative reading means no link: a connected radio always reports a
+// negative dBm.
+static int wifiLevel(int rssi) {
+    if (rssi >= 0)   return 0;
+    if (rssi >= -60) return 3;
+    if (rssi >= -70) return 2;
+    return 1;
+}
+
 // Two states, one object: a ring that fills clockwise as the poll interval
 // runs down, and a spinner while the fetch it was counting towards is actually
 // happening. Making the interval visible is the point. Every poll spends a
 // sliver of the budget this screen reports, so the thing that spends it should
 // be something you can watch, and eventually tap to pull forward -- see
 // "Refresh as a visible, tappable object" in plan.md.
-static void drawRefreshIndicator(int y, bool fetching, float frac) {
+static void drawRefreshIndicator(int y, bool fetching, float frac, bool failed) {
+    // Failure outranks everything here: it holds the circle for a few seconds
+    // after an attempt that did not work, then gives way to the countdown to
+    // the retry.
+    if (failed) { ctrlFail(y, C_CTRL); return; }
     if (fetching) {
         static uint8_t phase = 0;
-        ctrlSpokes(y, phase % V_SPOKES, C_DIM);
+        ctrlDots(y, phase % V_SPOKES, C_CTRL);
         phase++;
         return;
     }
-    ctrlRing(y, C_DIM);
-    ctrlWedge(y, frac, C_DIM);
+    ctrlRing(y, C_CTRL);
+    ctrlWedge(y, frac, C_CTRL);
 }
 
 // Straddles the track's end edge -- the boundary you just crossed. The ring is
@@ -869,8 +1004,8 @@ static void drawSpinner(int x, int y) {
     phase++;
 }
 
-void uiDashboard(const UsageData& data, unsigned long lastFetchMs, int rssi,
-                 int batPct, bool fetching, int pollSec) {
+void uiDashboard(const UsageData& data, unsigned long lastAttemptMs, int rssi,
+                 int batPct, bool fetching, int pollSec, bool refreshFailed) {
     g->fillScreen(C_BG);
 
     // Vertical layout, 2026-09-19 — two columns side by side instead of two
@@ -894,13 +1029,13 @@ void uiDashboard(const UsageData& data, unsigned long lastFetchMs, int rssi,
     // failure this device exists to make visible, and a ring you can watch
     // fill says when the next reading is due without spending a line of text
     // on it. See docs/design-decisions.md.
-    ctrlDisc(V_CIRCLE_Y[0], C_DIM);
-    ctrlDisc(V_CIRCLE_Y[1], C_DIM);
+    drawMenuGlyph(V_CIRCLE_Y[0], C_CTRL);
+    drawWifiGlyph(V_CIRCLE_Y[1], wifiLevel(rssi), C_CTRL);
 
     float frac = 1.0f;
-    if (pollSec > 0)
-        frac = (float)(millis() - lastFetchMs) / ((float)pollSec * 1000.0f);
-    drawRefreshIndicator(V_CIRCLE_Y[2], fetching, frac);
+    if (pollSec > 0 && lastAttemptMs != 0)
+        frac = (float)(millis() - lastAttemptMs) / ((float)pollSec * 1000.0f);
+    drawRefreshIndicator(V_CIRCLE_Y[2], fetching, frac, refreshFailed);
 
     flush();
 }

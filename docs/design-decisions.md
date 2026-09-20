@@ -994,6 +994,74 @@ identical circles above it. Nobody would have been able to name that; everyone
 would have seen it. Testing pixels is the same escape `drawMarkX` takes, for
 the same reason, at the same negligible cost.
 
+## The control column: three glyphs, and how loud they are
+
+**2026-09-20.** Menu, signal, refresh. The discs that stood in for them read
+as three lamps — the brightest thing on a screen whose job is a number and a
+bar. Drawing the real glyphs takes about five-sixths of that ink away on its
+own: a disc is 812 lit pixels, the menu bars are 144, a full-strength signal
+glyph is 319, the countdown ring at rest is 96.
+
+`C_CTRL` exists so the rest is one line. The column is chrome and should lose
+to the numbers; the pace words are content and use `C_DIM` for a different
+reason. Giving them one colour meant tuning either one moved both.
+
+### Signal strength: ghosted, or absent
+
+Two treatments, both drawn. **Ghosted** keeps the whole figure at every level
+and outlines the bands the signal doesn't reach, so strength reads as how much
+of one shape is solid and the scale is on screen every time you look.
+**Absent** draws only the bands you have — quieter, and quietest exactly when
+the news is worst.
+
+That inversion is the usual argument against absent, and it no longer holds
+here, because the alarm moved. A link too weak to fetch through now shows as a
+failed refresh on the circle below, which reports the thing that actually
+matters rather than a proxy for it. What absent gives up is the scale: a lone
+dot means "weak" only if you remember the figure it belongs to. On a device
+one person keeps on one desk, that is learned once.
+
+No-link keeps the full ghosted figure under a strike either way. It is the one
+signal state worth being loud about, and a strike through nothing says nothing.
+
+This supersedes the earlier three-state table above, which had a good link show
+nothing at all. That was written when the glyph would have had to live in a
+corner of the dashboard and earn its pixels; the control column is a permanent
+home, and an indicator that vanishes when healthy can't be told from one that
+is broken.
+
+### The spinner: bars or dots
+
+Eight positions, one moving gap, two treatments. The dots carry slightly more
+ink — 196 lit pixels against 143 — and far fewer edges. Which reads quieter in
+the corner of the eye is not something a pixel count settles, so both are in
+`explore.html` and the device is running dots.
+
+### Failure holds for five seconds, and that is not enough
+
+A failed refresh fills the circle and takes an X back out of it: the loudest
+mark in the column, for the only thing there that is bad news. It is the same
+X as the blocked-overage token, so a cross means the same thing wherever it
+appears. After five seconds it gives way to the countdown to the retry.
+
+**What five seconds cannot do.** A device failing every poll shows the X for
+five seconds in every three hundred and looks healthy for the rest. That is
+precisely the stale-reading-that-looks-fresh failure this project exists to
+prevent. The five seconds are an announcement; the standing condition still
+needs somewhere to live. The likeliest answer is that the ring itself changes
+colour until a fetch succeeds — the announcement is transient, the condition
+is not — but that is a decision, not a detail, and it is open.
+
+### The bug the indicator found
+
+Retries were scheduled from the last *successful* fetch. That value only
+advances when a fetch works, so a failing device asked again on every pass of
+`loop()` — against an endpoint `fetcher.h`'s own comments are careful to say
+rate-limits hard. Nothing on screen could have shown it, because nothing on
+screen knew an attempt had happened. `fetcherLastAttemptMs()` now exists, the
+schedule keys off it, and so does the ring. Building the thing that displays a
+mechanism is a good way to find out the mechanism was wrong.
+
 ## The dashboard has one touch target now
 
 **2026-09-20.** A tap anywhere used to open the menu. That was right when the

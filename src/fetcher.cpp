@@ -28,6 +28,7 @@ static SemaphoreHandle_t s_mutex = nullptr;
 // freshness it did not have.
 static UsageData     s_usage{};
 static unsigned long s_lastGoodMs = 0;
+static unsigned long s_lastAttemptMs = 0;
 static uint32_t      s_lastDurMs  = 0;
 static char          s_lastError[64] = {0};
 
@@ -58,6 +59,7 @@ static void fetchTask(void*) {
         uint32_t dur = millis() - t0;
 
         xSemaphoreTake(s_mutex, portMAX_DELAY);
+        s_lastAttemptMs = millis();
         if (local.ok) {
             // Only success replaces the published reading.
             s_usage      = local;
@@ -98,6 +100,8 @@ int32_t fetcherAgeSec() {
 }
 
 const char* fetcherLastError() { return s_lastError; }
+
+unsigned long fetcherLastAttemptMs() { return s_lastAttemptMs; }
 
 void fetcherSnapshot(UsageData& out, unsigned long& lastGoodMsOut) {
     if (!s_mutex) { out = s_usage; lastGoodMsOut = s_lastGoodMs; return; }

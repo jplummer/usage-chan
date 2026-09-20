@@ -41,10 +41,12 @@ of the month. The extra-usage allowance is a monthly billing window sharing no
 edge with either window the dashboard draws, which means the diamond is in the
 wrong place on the overage bar.
 
-The control column has started to do something. Its third circle is a
-refresh clock that fills as the poll interval runs down and a spinner while a
-fetch is happening; its first opens the menu, which is now the dashboard's
-only touch target.
+The control column is real. Menu bars at the top, a four-state signal glyph in
+the middle, and a refresh indicator at the bottom that counts down to the next
+attempt, spins while one is running, and shows a struck-out circle for five
+seconds after one fails. The top glyph is the dashboard's only touch target.
+Two treatments are still undecided — spinner bars or dots, ghosted or absent
+signal bands — and both are in `explore.html` section 7.
 
 Nothing is blocked. The next few moves are small and listed below.
 
@@ -54,6 +56,8 @@ Nothing is blocked. The next few moves are small and listed below.
 
 ### Next up
 
+- **Tune the control column.** The glyphs are on the device and the colour is one constant, `C_CTRL`. Decide bars or dots, ghosted or absent, and how far down `C_CTRL` should go.
+- **Give a standing failure somewhere to live.** The failed-refresh X holds for five seconds, so a device failing every poll looks healthy for 295 of every 300. Likeliest fix is the ring taking a failure colour until a fetch succeeds. See `docs/design-decisions.md`.
 - **Confirm the `[CAP]` line with your own eyes.** The dump fix is flashed and the device is running it, but the block prints in the first two seconds of boot and nothing remote can read that window (see the settled entry below). `pio device monitor -e stackchan`, then press reset.
 - **Fix the diamond on the overage bar.** It is placed by the base window's elapsed fraction, and the bar underneath it is filling against a month. Either derive the monthly elapsed fraction (the reset is the first of the month, so the start is the first of the previous one) or retire the diamond while overage is drawing.
 - **Decide the sub-12% headline word.** `nearly out` is 116px in a 102px slot. `explore.html` section 5 offers `very low` (96px), `low` (40px), or keeping the number.
@@ -324,6 +328,26 @@ pixels on the dashboard answering it forever.
 Decisions as they were made, newest first, so the reasoning survives the
 session. Display decisions live in `docs/design-decisions.md`; this log is the
 project-level ones.
+
+### 2026-09-20 — The control column draws real glyphs
+Menu bars, a four-state signal glyph and a refresh indicator that counts down,
+spins while fetching and shows a struck-out circle for five seconds after a
+failed attempt. All of it ported pixel-for-pixel from the 1x frames and checked
+against exported rasters: 136 differing pixels across nine icons, almost all of
+it single-pixel jitter on diagonal strokes.
+
+Two decisions are still open and both are in `explore.html` section 7: bars or
+dots for the spinner, and ghosted or absent for the unlit signal bands. The
+device is running dots and ghosted.
+
+`C_CTRL` now carries the column's colour, separately from `C_DIM`, so it can be
+taken down without dimming the pace words. Replacing the discs with glyphs
+already removed about five-sixths of the column's ink.
+
+**And it found a bug.** Retries were scheduled from the last successful fetch,
+which only advances when a fetch works — so a failing device asked again on
+every pass of `loop()`, against an endpoint that rate-limits hard. Now
+scheduled from the last attempt, which is also what the ring counts down.
 
 ### 2026-09-20 — The refresh circle, and one touch target
 The control column's third circle now shows the poll interval closing
