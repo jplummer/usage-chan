@@ -31,8 +31,12 @@ void uiLockoutTick(int secondsLeft);
 // attempt, not success, because the ring counts down to the next try. pollSec
 // is the poll interval; pass 0 to leave the ring empty. refreshFailed shows
 // the fail mark in place of the ring.
+// refreshFailing means the last attempt errored and none has succeeded since;
+// the countdown to the retry takes the warning colour for as long as that is
+// true. refreshFailed is the transient mark in its first few seconds.
 void uiDashboard(const UsageData& data, unsigned long lastAttemptMs, int rssi,
-                 int batPct, bool fetching, int pollSec, bool refreshFailed);
+                 int batPct, bool fetching, int pollSec, bool refreshFailed,
+                 bool refreshFailing);
 
 // Whether a dashboard touch landed on the menu button. The zone is larger
 // than the circle it draws -- see V_MENU_HIT_* in ui.cpp.

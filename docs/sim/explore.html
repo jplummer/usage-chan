@@ -4,6 +4,7 @@
 <link rel="stylesheet" href="sim.css">
 <script src="fonts.js"></script>
 <script src="lgfx.js"></script>
+<script src="icons.js"></script>
 <script src="screens.js"></script>
 <script src="dashboard-variants.js"></script>
 <style>
@@ -247,12 +248,17 @@
       figure either way: a strike through nothing says nothing.</p>
       <p><strong>Failure.</strong> The circle goes solid with an X taken out of
       it &mdash; the loudest mark in the column, for the only thing there that
-      is bad news. It holds for five seconds and then gives way to the countdown
-      to the retry. Worth noticing what that means: a device failing every poll
-      shows the X for five seconds in every three hundred and looks healthy for
-      the rest, which is the stale-reading-that-looks-fresh failure this project
-      exists to avoid. The five seconds are the announcement; the standing
-      condition still needs somewhere to live.</p>
+      is bad news. It holds for five seconds and then gives way to the
+      countdown to the retry, which stays the warning colour for as long as
+      nothing has succeeded. The mark is the announcement; the colour is what
+      is still true afterwards. Without it a device failing every poll showed
+      the X for five seconds in every three hundred and looked healthy for the
+      rest, which is the stale-reading-that-looks-fresh failure this project
+      exists to avoid.</p>
+      <p>Open: the mark itself and the spinner still draw in the column's own
+      colour, so a failure sequence goes grey mark, then yellow countdown. The
+      announcement being quieter than the condition is the wrong way round, and
+      it is one constant either way.</p>
       <div class="grid" id="ctrlzoom"></div>
     </div>
     <div class="controls">
@@ -371,6 +377,7 @@
     ['spinner &middot; bars', V.V_CIRCLE_Y2, st => Object.assign({}, st, { fetching: true, spinner: 'bars' })],
     ['spinner &middot; dots', V.V_CIRCLE_Y2, st => Object.assign({}, st, { fetching: true, spinner: 'dots' })],
     ['refresh failed', V.V_CIRCLE_Y2, st => Object.assign({}, st, { refreshFailed: true })],
+    ['still failing', V.V_CIRCLE_Y2, st => Object.assign({}, st, { refreshFailing: true })],
   ].map(([t, cy, fn]) => { const c = refCell($('ctrlzoom'), t, null); c.cy = cy; c.fn = fn; return c; });
 
   const LADDER = [

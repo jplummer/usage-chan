@@ -13,6 +13,11 @@
     name: 'shipped',
     bg: 0x14110F, card: 0x241F1B, text: 0xE8E3DD, dim: 0x8A817A,
     accent: 0xD97757, ok: 0x5FA672, warn: 0xD9A441, crit: 0xD9564F, pay: 0x6E93C9,
+    // The control column draws in its own colour rather than borrowing dim.
+    // It is chrome, not content: it competes with the numbers for attention
+    // and should lose. Separate so it can come down without dimming the pace
+    // words, which say something.
+    ctrl: 0x8A817A,
     small: 'Font2',                 // labels, captions, status, menu rows
     headline: 'FreeSansBold24pt7b', // the big number (horizontal layout only)
     title: 'FreeSansBold18pt7b',    // boot and setup screens
@@ -197,21 +202,12 @@
   const V_SPOKES = 8, V_SPOKE_R0 = 6, V_SPOKE_R1 = 16, V_SPOKE_HW = 1;
   // The other spinner: eight dots on a ring, same eight positions, same gap.
   const V_DOT_RING = 12.8, V_DOT_R = 2.9;
-  // Refresh failed: the circle filled, with an X taken back out of it.
-  const V_FAIL_ARM = 8.6, V_FAIL_T = 2.0;
   const V_FAIL_HOLD_MS = 5000;
   // The menu button's touch zone, deliberately bigger than its circle: 32px is
   // about 5mm on this panel and the reliable floor is nearer 7mm.
   const V_MENU_HIT_L = 264, V_MENU_HIT_T = 0, V_MENU_HIT_R = 320, V_MENU_HIT_B = 56;
-  // The menu glyph: three bars, from the frame.
-  const V_MENU_BAR_X = 4, V_MENU_BAR_W = 24, V_MENU_BAR_H = 2;
-  const V_MENU_BAR_Y = [5, 15, 25];
-  // The wifi glyph: three concentric wedges about a centre below the box, each
-  // spanning 45 degrees either side of straight up. Radii measured off the
-  // frame's ellipses. Index 0 is the dot, 2 the outermost arc.
-  const V_WIFI_CX = 16.03, V_WIFI_CY = 28.5;
-  const V_WIFI_R = [[0, 5.11], [7.76, 13.955], [16.61, 22.8]];
-  const V_WIFI_STRIKE = [27, 4, 5, 26];   // x0, y0, x1, y1, box coords
+  // The wifi levels are a data rule, not a picture: four buckets because the
+  // frames draw four. The pictures come from design/icons via icons.js.
   const V_TRACK_H = 224;               // both bars, every state: a bar that
                                        // changes length makes the screen
                                        // twitch exactly when it has something
@@ -445,22 +441,6 @@
     }
   }
 
-  // The refresh failed: the circle goes solid and an X is taken back out of
-  // it. The loudest mark in the column, which is right -- it is the only thing
-  // there that is bad news. Same X as the blocked-overage token, so a cross
-  // means the same thing wherever it appears.
-  function ctrlFail(g, y, col) {
-    for (let py = 0; py < V_CIRCLE_D; py++)
-      for (let px = 0; px < V_CIRCLE_D; px++) {
-        const dx = px + 0.5 - V_CIRCLE_R, dy = py + 0.5 - V_CIRCLE_R;
-        if (dx * dx + dy * dy > V_CIRCLE_R * V_CIRCLE_R) continue;
-        const a = Math.abs(dx + dy), b = Math.abs(dx - dy);
-        if ((b <= V_FAIL_T && a <= V_FAIL_ARM * 2) ||
-            (a <= V_FAIL_T && b <= V_FAIL_ARM * 2)) continue;
-        g.drawPixel(V_CTRL_X + px, y + py, col);
-      }
-  }
-
   // Eight spokes with one missing, the gap advancing a step per redraw. Each
   // spoke is tested in its own rotated frame: distance along it against the
   // two radii, distance across it against half the width.
@@ -481,73 +461,24 @@
       }
   }
 
-  // ── The menu glyph ──────────────────────────────────────
-  // Three bars. Nothing clever, and deliberately not a disc: the discs that
-  // stood in for these read as three lamps and pulled the eye off the numbers,
-  // which is the opposite of what a control column is for.
-  function drawMenuGlyph(g, y, col) {
-    for (const by of V_MENU_BAR_Y)
-      g.fillRect(V_CTRL_X + V_MENU_BAR_X, y + by, V_MENU_BAR_W, V_MENU_BAR_H, col);
-  }
-
-  // ── The wifi glyph ──────────────────────────────────────
-  // Three concentric wedges and a strike, all four states out of one shape.
-  // A band is filled when the signal reaches it and outlined when it doesn't,
-  // so strength reads as how much of the same figure is solid rather than as
-  // four different pictures. level: 3 hi, 2 med, 1 lo, 0 no link.
-  function wifiInBand(b, px, py) {
-    const dx = px + 0.5 - V_WIFI_CX, dy = py + 0.5 - V_WIFI_CY;
-    if (dy >= 0) return false;                    // upper half only
-    if (Math.abs(dx) > -dy) return false;         // 45 degrees either side
-    const d = Math.hypot(dx, dy);
-    return d >= V_WIFI_R[b][0] && d <= V_WIFI_R[b][1];
-  }
-
-  // ghost: an unlit band shows as its own outline, so the figure keeps a
-  // constant silhouette and strength reads as how much of it is solid. With
-  // ghost off the unlit bands are simply absent, which is quieter and is how
-  // every phone draws this -- at the cost of the scale being implied rather
-  // than shown. No-link keeps the ghosted figure either way: it is the one
-  // state worth being loud about, and a strike through nothing says nothing.
-  function drawWifiGlyph(g, y, level, col, bg, ghost) {
-    if (ghost === undefined) ghost = true;
-    for (let b = 0; b < 3; b++) {
-      const filled = level >= b + 1;
-      if (!filled && !ghost && level > 0) continue;
-      for (let py = 0; py < V_CIRCLE_D; py++)
-        for (let px = 0; px < V_CIRCLE_D; px++) {
-          if (!wifiInBand(b, px, py)) continue;
-          // An unfilled band shows as its own one-pixel edge: in the band,
-          // with a neighbour outside it.
-          if (!filled &&
-              wifiInBand(b, px - 1, py) && wifiInBand(b, px + 1, py) &&
-              wifiInBand(b, px, py - 1) && wifiInBand(b, px, py + 1)) continue;
-          g.drawPixel(V_CTRL_X + px, y + py, col);
-        }
+  // ── Icons ───────────────────────────────────────────────
+  // One uint32 per row, bit 31 leftmost, 32 rows, generated from the Figma
+  // frames by tools/icons2c.py. Every fixed picture in the control column is
+  // one of these; only the things driven by a live value -- the countdown
+  // wedge, the spinner -- are still drawn by hand.
+  function drawIcon(g, x, y, rows, col) {
+    if (!rows) return;
+    for (let py = 0; py < 32; py++) {
+      const r = rows[py];
+      if (!r) continue;
+      for (let px = 0; px < 32; px++)
+        if (r & (1 << (31 - px))) g.drawPixel(x + px, y + py, col);
     }
-    if (level > 0) return;
-    // No link: a strike through the whole glyph, carrying a background-coloured
-    // gap either side so it reads as lying on top of the arcs rather than
-    // joining them. Same trick as the overage token's ring.
-    const [x0, y0, x1, y1] = V_WIFI_STRIKE;
-    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
-    for (const [c, w] of [[bg, 1], [col, 0]])
-      for (let i = 0; i <= n; i++) {
-        const sx = Math.round(x0 + (x1 - x0) * i / n);
-        const sy = Math.round(y0 + (y1 - y0) * i / n);
-        for (let oy = -w; oy <= w; oy++)
-          for (let ox = -w; ox <= w; ox++) {
-            const px = sx + ox, py = sy + oy;
-            if (px < 0 || py < 0 || px >= V_CIRCLE_D || py >= V_CIRCLE_D) continue;
-            g.drawPixel(V_CTRL_X + px, y + py, c);
-          }
-      }
   }
 
   // RSSI is a proxy for "will fetches work", and a coarse one -- see the open
-  // note in design-decisions.md. Four buckets because the frame draws four.
-  // A non-negative reading means no link: a connected radio always reports a
-  // negative dBm.
+  // note in design-decisions.md. A non-negative reading means no link: a
+  // connected radio always reports a negative dBm.
   function wifiLevel(rssi) {
     if (rssi >= 0) return 0;
     if (rssi >= -60) return 3;
@@ -555,22 +486,42 @@
     return 1;
   }
 
+  // ghost: the bands the link doesn't reach show as their own outline, so the
+  // figure keeps one silhouette and the scale is on screen every time you
+  // look. With ghost off they are simply absent -- quieter, and quietest when
+  // the news is worst. No-link keeps the ghosted figure either way: it is the
+  // one state worth being loud about, and a strike through nothing says
+  // nothing.
+  function wifiIcon(rssi, ghost) {
+    const I = window.ICONS || {};
+    switch (wifiLevel(rssi)) {
+      case 3:  return I['wifi-hi'];
+      case 2:  return ghost ? I['wifi-med'] : I['wifi-med-alt'];
+      case 1:  return ghost ? I['wifi-lo']  : I['wifi-lo-alt'];
+      default: return I['wifi-out'];
+    }
+  }
+
   // Two states, one object: a ring that fills clockwise as the poll interval
   // runs down, and a spinner while the fetch it was counting towards is
   // happening. Every poll spends a sliver of the budget this screen reports,
   // so the thing that spends it should be something you can watch.
-  function drawRefreshIndicator(g, T, y, fetching, frac, phase, failed, style) {
-    // Failure outranks everything: it is shown for a few seconds after a failed
-    // attempt and then gives way to the countdown to the retry.
-    if (failed) { ctrlFail(g, y, T.dim); return; }
+  function drawRefreshIndicator(g, T, y, fetching, frac, phase, failed, style, failing) {
+    // The mark for a failed attempt outranks everything: it holds the circle
+    // for a few seconds and then gives way to the countdown to the retry.
+    if (failed) { drawIcon(g, V_CTRL_X, y, (window.ICONS || {})['refresh-fail'], T.ctrl); return; }
     if (fetching) {
       const gap = (phase | 0) % V_SPOKES;
-      if (style === 'bars') ctrlSpokes(g, y, gap, T.dim);
-      else                  ctrlDots(g, y, gap, T.dim);
+      if (style === 'bars') ctrlSpokes(g, y, gap, T.ctrl);
+      else                  ctrlDots(g, y, gap, T.ctrl);
       return;
     }
-    ctrlRing(g, y, T.dim);
-    ctrlWedge(g, y, frac, T.dim);
+    // Counting down after a failure is a standing condition, not an event, so
+    // it gets a colour rather than a shape. The five-second mark is the
+    // announcement; this is what is still true afterwards.
+    const col = failing ? T.warn : T.ctrl;
+    ctrlRing(g, y, col);
+    ctrlWedge(g, y, frac, col);
   }
 
   // The dashboard's one touch target.
@@ -595,13 +546,14 @@
     // Menu, signal, refresh. The first two are still discs standing in for
     // icons. The third is real: a ring that fills as the poll interval runs
     // down, or a spinner while the fetch is actually in flight.
-    drawMenuGlyph(g, V_CIRCLE_Y0, T.dim);
-    drawWifiGlyph(g, V_CIRCLE_Y1, wifiLevel(s.rssi === undefined ? -55 : s.rssi),
-                  T.dim, T.bg, s.wifiGhost === undefined ? true : s.wifiGhost);
+    drawIcon(g, V_CTRL_X, V_CIRCLE_Y0, (window.ICONS || {}).menu, T.ctrl);
+    drawIcon(g, V_CTRL_X, V_CIRCLE_Y1,
+             wifiIcon(s.rssi === undefined ? -55 : s.rssi,
+                      s.wifiGhost === undefined ? true : s.wifiGhost), T.ctrl);
     drawRefreshIndicator(g, T, V_CIRCLE_Y2, !!s.fetching,
                          s.pollFrac === undefined ? 1 : s.pollFrac,
                          s.spinPhase || 0, !!s.refreshFailed,
-                         s.spinner || 'dots');
+                         s.spinner || 'dots', !!s.refreshFailing);
   }
 
   // Factored out of dashboard() so the exploratory sim pages (dashboard-
@@ -759,8 +711,7 @@
   const V = { V7_X, V7_W, V5_X, V5_W, V5_TEXT_X, V7_TEXT_R,
               V_CTRL_X, V_CTRL_W, V_TRACK_H, V_TITLE_Y, V_HEAD_Y, V_FOOT_Y,
               V_CIRCLE_Y0, V_CIRCLE_Y1, V_CIRCLE_Y2, V_CIRCLE_D, V_SPOKES,
-              V_MENU_BAR_X, V_MENU_BAR_W, V_MENU_BAR_H, V_MENU_BAR_Y,
-              V_DOT_RING, V_DOT_R, V_FAIL_ARM, V_FAIL_T, V_FAIL_HOLD_MS,
+              V_DOT_RING, V_DOT_R, V_FAIL_HOLD_MS,
               V_MENU_HIT_L, V_MENU_HIT_T, V_MENU_HIT_R, V_MENU_HIT_B };
 
   window.SCREENS = { SHIPPED, dashboard, menu, pin, boot, setup, connecting, lockout, error,
@@ -768,6 +719,6 @@
                      drawMarkX, captionY, drawToken, outlinedGlyph, V,
                      ctrlDisc, ctrlRing, ctrlWedge, ctrlSpokes,
                      drawRefreshIndicator, menuButtonHit,
-                     drawMenuGlyph, drawWifiGlyph, wifiLevel, ctrlDots, ctrlFail,
+                     drawIcon, wifiIcon, wifiLevel, ctrlDots,
                      drawWindowBar, drawSevenDayBar, drawStatusLine };
 })();

@@ -4,6 +4,7 @@
 <link rel="stylesheet" href="sim.css">
 <script src="fonts.js"></script>
 <script src="lgfx.js"></script>
+<script src="icons.js"></script>
 <script src="screens.js"></script>
 
 <div class="wrap">
@@ -34,6 +35,11 @@
       <label class="check"><input type="checkbox" id="bind"> 7-day is the binding limit</label>
       <label class="check"><input type="checkbox" id="stale"> last fetch failed</label>
       <label class="check"><input type="checkbox" id="fetch"> fetch in flight (spinner)</label>
+      <label class="check"><input type="checkbox" id="rfail"> last refresh failed (mark, 5s)</label>
+      <label class="check"><input type="checkbox" id="rfailing"> still failing (warn countdown)</label>
+      <label class="check"><input type="checkbox" id="wghost" checked> signal: ghost the unlit bands</label>
+      <div class="ctl"><label for="rssi">signal <b id="rssiv">-55 dBm</b></label>
+        <input type="range" id="rssi" min="-95" max="-30" value="-55"></div>
       <div class="ctl"><label for="poll">through the poll interval <b id="pollv">62%</b></label>
         <input type="range" id="poll" min="0" max="100" value="62"></div>
       <div class="ctl"><label for="spin">spinner step <b id="spinv">0</b></label>
@@ -72,6 +78,10 @@
       fetching: $('fetch').checked, phase: 1,
       pollFrac: $('poll').value / 100,
       spinPhase: +$('spin').value,
+      refreshFailed: $('rfail').checked,
+      refreshFailing: $('rfailing').checked,
+      wifiGhost: $('wghost').checked,
+      rssi: +$('rssi').value,
       overage: $('ov').checked ? {
         active: true,
         status: $('ovstatus').querySelector('[aria-pressed="true"]').dataset.v,
@@ -82,6 +92,7 @@
     };
     ['util', 'el', 'u7', 'e7', 'ovrem', 'poll'].forEach(k => $(k + 'v').textContent = $(k).value + '%');
     $('spinv').textContent = $('spin').value;
+    $('rssiv').textContent = $('rssi').value + ' dBm';
     SCREENS.dashboard(g, T, s);
     g.blit($('dash'), scale);
     $('cap').textContent = `${scale}× · 320×240 · ${(s.h5 / 100 - s.e5) > 0 ? 'ahead' : 'behind'} by ${Math.abs(Math.round((s.h5 / 100 - s.e5) * 288))}px`;

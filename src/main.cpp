@@ -273,11 +273,11 @@ void loop() {
         // The ring counts down to the next attempt, so it is fed attempt time.
         // The fail mark shows for a few seconds after an attempt that did not
         // work, then gives way to that countdown.
-        const bool failed = fetcherLastError()[0] != '\0' && lastTry != 0 &&
-                            millis() - lastTry < UI_FAIL_HOLD_MS;
+        const bool failing = fetcherLastError()[0] != '\0' && lastTry != 0;
+        const bool failed  = failing && millis() - lastTry < UI_FAIL_HOLD_MS;
         uiDashboard(g_usage, lastTry,
                     WiFi.isConnected() ? WiFi.RSSI() : 0, halBatPercent(),
-                    fetcherBusy(), g_settings.pollSec, failed);
+                    fetcherBusy(), g_settings.pollSec, failed, failing);
         lastRedraw = millis();
     }
 

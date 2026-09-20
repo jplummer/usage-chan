@@ -994,6 +994,44 @@ identical circles above it. Nobody would have been able to name that; everyone
 would have seen it. Testing pixels is the same escape `drawMarkX` takes, for
 the same reason, at the same negligible cost.
 
+## Icons are exported, not translated
+
+**2026-09-20.** Every icon before this one was translated by hand: read the
+ellipse radii out of Figma, guess a predicate, render it, diff it against the
+real thing, adjust, repeat. The wifi glyph took four rounds of numerical
+fitting and landed 1–2% divergent, which is what a rasterised vector costs when
+you rebuild it from parameters rather than from pixels.
+
+The parameters bought nothing. Nobody is going to want a 43%-thick wifi wave at
+runtime — these are pictures, not gauges, and a picture's natural form on a
+device like this is a bitmap. `tools/icons2c.py` reads the PNGs in
+`design/icons/`, thresholds them at the midpoint between the frame's background
+and its ink, and writes `src/icons.h` and `docs/sim/icons.js` from the same
+bits. Eight icons, 1024 bytes of flash, one uint32 per row because 32 pixels is
+exactly a word — which is the other reason the box is 32 and not 33.
+
+`tools/verify-icons.js` renders a real dashboard, lifts the 32×32 box out of
+the control column and compares it against the PNG. It reads zero differing
+pixels across every icon. The same check against the hand-fitted versions read
+1–2% on every one of them.
+
+**What stays hand-drawn.** Anything driven by a live value: the countdown
+wedge, which is a continuous fraction, and the spinner, which is one dot
+rotated eight ways. A bitmap per spinner frame would work and would be a worse
+thing to edit than one radius.
+
+**Thresholded, not anti-aliased.** One ink colour, one bit. The screen is pixel
+art on purpose, and a 2-bit alpha channel would quadruple the data to soften
+edges nobody wants softened.
+
+**The workflow this buys.** Edit the frame, export it, run the tool, build.
+Nothing to fit, nothing to argue about, and the simulator and the device read
+identical bytes rather than two ports of the same intent. The one sharp edge is
+getting the PNG out of Figma: base64 through a chat window arrived corrupt
+twice — the file was the right length and one byte inside was wrong, which a
+zlib checksum caught and a length check did not. Download the asset URL with
+`curl` instead.
+
 ## The control column: three glyphs, and how loud they are
 
 **2026-09-20.** Menu, signal, refresh. The discs that stood in for them read
@@ -1044,13 +1082,17 @@ mark in the column, for the only thing there that is bad news. It is the same
 X as the blocked-overage token, so a cross means the same thing wherever it
 appears. After five seconds it gives way to the countdown to the retry.
 
-**What five seconds cannot do.** A device failing every poll shows the X for
-five seconds in every three hundred and looks healthy for the rest. That is
-precisely the stale-reading-that-looks-fresh failure this project exists to
-prevent. The five seconds are an announcement; the standing condition still
-needs somewhere to live. The likeliest answer is that the ring itself changes
-colour until a fetch succeeds — the announcement is transient, the condition
-is not — but that is a decision, not a detail, and it is open.
+**Five seconds is the announcement, not the condition.** A device failing
+every poll would show the X for five seconds in every three hundred and look
+healthy for the rest — precisely the stale-reading-that-looks-fresh failure
+this project exists to prevent. So the countdown that follows the mark draws
+in the warning colour for as long as nothing has succeeded. An event gets a
+shape; a standing condition gets a colour.
+
+Still crooked: the mark and the spinner draw in the column's own colour, so
+the sequence runs grey mark, then yellow countdown. The announcement being
+quieter than the condition is the wrong way round. One constant either way,
+and not yet decided.
 
 ### The bug the indicator found
 
