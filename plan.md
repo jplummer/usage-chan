@@ -213,7 +213,7 @@ Ten targets instead of one. Up to 36 taps became four. The old screen dialled ea
 
 The workflow is now: edit the frame, export it, run the tool, build. That is the answer to "what is easiest to work with" for anything headed for a lot of iteration. What stays hand-drawn is only what a live value drives — the countdown wedge and the spinner.
 
-One sharp edge worth knowing: base64 through a chat window arrived corrupt twice, right length and one byte wrong. `curl` the asset URL instead.
+Two sharp edges worth knowing. Base64 through a chat window arrived corrupt twice, right length and one byte wrong — `curl` the asset URL instead. And the threshold has to be computed in linear light, not sRGB: the plugin export and the REST export of the same frames disagreed by up to 36 pixels out of 1024 until it was, and by zero after.
 
 ### 2026-09-20 — The control column draws real glyphs
 Menu bars, a four-state signal glyph and a refresh indicator that counts down, spins while fetching and shows a struck-out circle for five seconds after a failed attempt. All of it ported pixel-for-pixel from the 1x frames and checked against exported rasters: 136 differing pixels across nine icons, almost all of it single-pixel jitter on diagonal strokes.

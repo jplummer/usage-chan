@@ -59,7 +59,10 @@ function png(path) {
     }
     p += stride;
   }
-  const lum = i => ch <= 2 ? out[i] : out[i] * 0.3 + out[i + 1] * 0.59 + out[i + 2] * 0.11;
+  // Linear light, matching tools/icons2c.py -- see lum() there for why.
+  const lin = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const lum = i => ch <= 2 ? lin(out[i])
+                           : lin(out[i]) * 0.3 + lin(out[i + 1]) * 0.59 + lin(out[i + 2]) * 0.11;
   let ink = 0;
   for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++)
     ink = Math.max(ink, lum(((INSET + y) * w + INSET + x) * ch));

@@ -565,6 +565,8 @@ The parameters bought nothing. Nobody is going to want a 43%-thick wifi wave at 
 
 **Thresholded, not anti-aliased.** One ink colour, one bit. The screen is pixel art on purpose, and a 2-bit alpha channel would quadruple the data to soften edges nobody wants softened.
 
+**And thresholded in linear light**, which turned out to be the whole ballgame. A renderer computes an antialiased edge pixel as coverage in linear light and then encodes it to sRGB, so comparing the encoded value against a midpoint asks the wrong question — and answers it differently depending on how the renderer handles gamma. Measured when the REST fetch went in: the same eight frames exported through Figma's plugin API and through its REST API disagreed by up to 36 pixels out of 1024 thresholded in sRGB, and by zero thresholded in linear light. `wifi-out` changed by 44% of its ink just from switching which door the PNG came out of. One of those numbers means the pipeline is trustworthy and the other means it is a coin flip; the bug was found only because the counts were printed and someone read them.
+
 **The workflow this buys.** Edit the frame, export it, run the tool, build. Nothing to fit, nothing to argue about, and the simulator and the device read identical bytes rather than two ports of the same intent. The one sharp edge is getting the PNG out of Figma: base64 through a chat window arrived corrupt twice — the file was the right length and one byte inside was wrong, which a zlib checksum caught and a length check did not. Download the asset URL with `curl` instead.
 
 ## The control column: three glyphs, and how loud they are
