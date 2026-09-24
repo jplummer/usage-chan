@@ -11,13 +11,14 @@
  * soft power (M5.BtnPWR, unused so far), so everything happens on the panel.
  * Two input styles coexist deliberately:
  *
- *   PIN entry and boot use BtnA/B/C — M5Unified's three synthesised zones along
- *   the bottom 36px, which every such screen labels.
- *     PIN entry   left = next digit value, middle = confirm digit
+ *   Boot uses BtnA/B — M5Unified's synthesised zones along the bottom 36px,
+ *   unlabelled.
  *     Boot        hold left + middle for 2s = factory reset (wipes NVS)
  *
- *   Dashboard and menu read RAW touch coordinates, so a tap anywhere opens the
- *   menu and there is no permanent button strip eating 36 pixels.
+ *   PIN entry, dashboard and menu read RAW touch coordinates, so the keypad
+ *   gets ten real targets, a tap anywhere opens the menu, and there is no
+ *   permanent button strip eating 36 pixels.
+ *     PIN entry   a 3x4 keypad; the fourth digit submits
  *     Dashboard   tap anywhere = open menu
  *     Menu        tap a row = act · tap outside the rows = close
  */

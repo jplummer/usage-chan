@@ -8,7 +8,8 @@
  * the same generated bits, a non-zero count means something drifted -- a wrong
  * icon chosen for a state, a moved circle, a stale icons.js.
  *
- * This replaces an hour of eyeballing per icon. It is also the thing that
+ * tools/fetch-icons.sh runs this after every fetch, so drift shows up as a
+ * pixel count rather than waiting for someone to notice it on screen. It also
  * proves the pipeline: before the icons were generated, the same check ran at
  * 1-2% divergence, which was the cost of translating shapes by hand.
  */

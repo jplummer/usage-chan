@@ -748,8 +748,8 @@ static void drawVBar(bool primary, const char* label, float util,
     }
 }
 
-// The bottom strip, used only by the screens that still drive BtnA/B/C — PIN
-// entry and boot. The dashboard has none: it reads raw taps, so it needs no
+// The bottom strip. Only boot still reads BtnA/B/C (factory reset), and it
+// draws no labels. The dashboard has none: it reads raw taps, so it needs no
 // permanent legend and gets those 36 pixels back.
 // The bottom strip's labels. Nothing calls it now that the PIN screen has a
 // keypad -- kept because the setup and error screens may want it back, and
@@ -879,7 +879,7 @@ void uiConnecting(const char* ssid, int attempt) {
 
 // ── PIN keypad ────────────────────────────────────────────
 // Ten targets instead of one. The old screen dialled each digit with
-// BtnA/BtnB, which is up to ten taps a digit plus a confirm -- 36 taps at
+// BtnA/BtnB, which is up to nine taps a digit plus a confirm -- 40 taps at
 // worst, and this device reboots every time it is flashed. A 320x240 touch
 // panel can show a keypad; it just needs raw touch coordinates rather than
 // the three synthesised zones. See "A real PIN keypad" in plan.md, parked

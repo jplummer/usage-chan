@@ -59,21 +59,13 @@ Submit. The device encrypts the token with your PIN, writes both to flash, and r
 
 The device asks for the PIN at every boot, including this one.
 
-There are no physical buttons for this. The bottom 36 pixels of the touchscreen are three buttons, labelled on screen:
-
-- **Left third** — advance the current digit
-- **Middle third** — confirm and move to the next digit
-
-Four digits, then it connects, syncs the clock, and fetches.
+The screen shows a keypad. Tap four digits; four dots fill as they land, and the fourth digit submits, so there's no confirm key. Backspace is at bottom right. Then it connects, syncs the clock, and fetches.
 
 If NTP is slow the boot continues anyway and keeps retrying in the background, so a stubborn network delays the countdowns rather than wedging the device.
 
-> **Known rough edge.** Worst case this is 36 taps. The LAN panel will let you
-> type the PIN in a browser instead, which also unlocks the device.
-
 ## 5. Check it
 
-One bar with a diamond on it, a seven-day line underneath, and a status line. Cross-check the numbers against `claude /usage` on your Mac, or OpenUsage if you run it. [`using.md`](using.md) explains what the diamond means.
+Two columns filling from the bottom – a wide one for the window that binds, usually the five-hour – with a diamond and a pace word on each, and three circles down the right. Cross-check the numbers against `claude /usage` on your Mac, or OpenUsage if you run it. [`using.md`](using.md) explains what the diamond means.
 
 ## When setup goes wrong
 
@@ -83,8 +75,7 @@ One bar with a diamond on it, a seven-day line underneath, and a status line. Cr
 | Nothing on the serial monitor | CoreS3 uses native USB, so the port only appears once firmware runs. An empty monitor means it did not get that far — re-run the upload and watch for an esptool error |
 | Upload dies at "Changing baud rate" | A stale `upload_speed` on a native-USB board. Nothing was written; reset and see [`flashing.md`](flashing.md) |
 | "WIFI FAILED", then the setup network reappears | Wrong password, or a 5 GHz network. The device falls back to a WiFi-only portal that keeps your token |
-| `no data: auth_failed` | Token rejected. Most likely expired — tokens last a year |
-| `no data: no_usage_h_200` | Authenticated fine, but this plan does not publish usage headers. Real on Enterprise and API-billed accounts |
+| `API not answering` over the dashboard | Three fetches failed in a row. The serial log's `[FETCH]` line says why: `auth_failed` is a rejected token, most likely expired (tokens last a year); `no_usage_h_200` means this plan publishes no usage headers, expected on Enterprise and API-billed accounts |
 | Wrong PIN | Lockout doubles from 60s. **Ten wrong attempts wipes the credentials** |
 
 ## Starting over

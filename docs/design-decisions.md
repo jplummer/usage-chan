@@ -293,7 +293,7 @@ Decided 2026-09-08. `docs/sim/` draws the device's screens in a browser from the
 
 The first render found one: the status line's em dash, which Font2 cannot draw, had been a blank on the device since it shipped.
 
-**PIN entry becomes a keypad.** Decided from the sim, 2026-09-08: ten targets in a 3×4 grid, four masked slots above, the fourth digit submits. Replaces the 36-tap digit cycling and the labelled button strip that existed to serve it.
+**PIN entry becomes a keypad.** Decided from the sim, 2026-09-08: ten targets in a 3×4 grid, four masked slots above, the fourth digit submits. Replaces the 40-tap digit cycling and the labelled button strip that existed to serve it.
 
 ## Figma was lying about type, and now it isn't
 
@@ -327,7 +327,7 @@ But at-rest encryption is not the only thing it is for.
 
 ### Decision
 
-**Keep the PIN. Remove the 36-tap boot entry.**
+**Keep the PIN. Remove the 40-tap boot entry.**
 
 The usability cost was never the PIN itself — it was entering four digits on a touchscreen with three virtual buttons. Upstream already solved that: a web-panel login unlocks the device. Porting the panel removes the pain and *strengthens* the case for keeping the credential.
 
@@ -625,7 +625,7 @@ The cost is that the device is less obviously alive to a stranger poking at it. 
 
 ## The PIN keypad — ten targets instead of one
 
-**2026-09-20.** The old screen dialled each digit with BtnA and BtnB: up to ten taps for a digit, plus a confirm, so 36 taps at worst for four digits. That was survivable when the device booted once. It is not survivable now, because every flash is a reboot and every reboot is a PIN, and this thing gets flashed several times an hour while the display is being worked on.
+**2026-09-20.** The old screen dialled each digit with BtnA and BtnB: up to nine taps for a digit, plus a confirm, so 40 taps at worst for four digits. That was survivable when the device booted once. It is not survivable now, because every flash is a reboot and every reboot is a PIN, and this thing gets flashed several times an hour while the display is being worked on.
 
 A 320x240 touch panel can show ten targets. It only ever needed raw touch coordinates rather than the three synthesised zones along the bottom, which is the same move the dashboard and menu already made. Parked as "A real PIN keypad" since 2026-09-04; unparked because the cost finally landed on the person building it.
 

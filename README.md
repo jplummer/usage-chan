@@ -4,9 +4,7 @@ A Stack-Chan that shows how much of your Claude rate-limit budget is left.
 
 It sits on a desk, polls `api.anthropic.com` every five minutes, and answers one question: *can I start this now, or should I wait?* No host computer, no org API key, no Mac daemon relaying over Bluetooth. The device does it alone.
 
-The bar is the **window**, not the budget. Its right edge is both exhaustion and reset — you race toward it either way, and the only question is which arrives first. A diamond marks where an even burn would have you, so the gap between the diamond and the bar's edge is the whole reading: behind pace is calm however little remains, ahead of pace is worth knowing.
-
-The seven-day window is one quiet line underneath, growing into a full bar only when the server says it is the limit that will actually stop you.
+The dashboard is two columns that fill from the bottom. The fill is what's left, and the bottom edge is the end of your quota. The wide column is whichever window the server says will stop you first – usually the five-hour one – and the thin column beside it is the other. A diamond marks where an even burn would have you right now, and a word beside it says how far off you are, from `well behind` to `well ahead`. Behind pace is calm however little remains; ahead of pace is worth knowing.
 
 No face and no servo yet. `plan.md` has the phases, and `docs/design-decisions.md` has the reasoning — including the behavioural research that argued against several things this device used to do.
 
@@ -14,7 +12,7 @@ No face and no servo yet. `plan.md` has the phases, and `docs/design-decisions.m
 
 An M5Stack CoreS3 — ESP32-S3, 16MB flash, 8MB PSRAM, 320x240 IPS touch — which is the standard Stack-Chan core. It works on a bare CoreS3 too; the servos, LEDs and touch pads that make a CoreS3 a Stack-Chan go unused in phase 1.
 
-The two physical buttons are reset and soft power, neither of which is a general-purpose input. The bottom 36 pixels of the touchscreen act as three buttons instead, and every screen labels them so you can see where they are. [`docs/hardware-notes.md`](docs/hardware-notes.md) has the rest of the face, including what the three Grove connectors are.
+The two physical buttons are reset and soft power, neither of which is a general-purpose input, so everything happens on the touchscreen: taps on the dashboard, and a keypad for the PIN. [`docs/hardware-notes.md`](docs/hardware-notes.md) has the rest of the face, including what the three Grove connectors are.
 
 ## How the numbers get here
 
@@ -27,9 +25,9 @@ anthropic-ratelimit-unified-7d-utilization
 anthropic-ratelimit-unified-7d-reset
 ```
 
-This is undocumented. It is not a published contract, and it can change without notice, though it has held steady across every project that has tried it. When the headers stop arriving the dashboard says `no data:` and the reason, rather than leaving yesterday's bars up.
+This is undocumented. It is not a published contract, and it can change without notice, though it has held steady across every project that has tried it. When fetches keep failing, the dashboard veils the last reading and says so – `no network` or `API not answering`, with the reading's age – rather than passing old bars off as current.
 
-Each poll is itself an API call, so the monitor spends a sliver of the budget it reports on. Two minutes is the default interval.
+Each poll is itself an API call, so the monitor spends a sliver of the budget it reports on. Five minutes is the default interval.
 
 ## Setup
 
@@ -56,12 +54,13 @@ the decryption key and is not stored anywhere, so forgetting it means a factory 
 
 ## Using it
 
-**Tap anywhere on the dashboard** to open the menu; tap outside its rows to close. PIN entry and boot still use three zones along the bottom 36 pixels, labelled on the screens that use them.
+**Tap anywhere on the dashboard** to open the menu; tap outside its rows to close.
 
-| Screen | Left third | Middle third |
-|---|---|---|
-| PIN entry | next digit | confirm digit |
-| Boot | hold both for 2s → factory reset | |
+**The PIN screen is a keypad.** Four dots fill as you type, no digit is ever shown, and the fourth digit submits, so there's no confirm key. A wrong PIN locks entry for a minute, doubling with each failure; ten wrong PINs wipe the stored credentials.
+
+**Factory reset:** hold the bottom-left and bottom-middle thirds of the screen (the bottom 36 pixels) for two seconds while the device boots. Nothing on screen marks these zones anymore.
+
+[`docs/using.md`](docs/using.md) covers everything on the screen and what to do when something is wrong.
 
 ## Layout
 
