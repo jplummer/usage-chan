@@ -2,17 +2,19 @@
 
 *Read down from the top. Where things stand, then what is open, then what is settled, then the background, then the archive. New work goes near the top; finished work moves to the bottom rather than being deleted. Keep it that way.*
 
+*Whenever a change alters what the device shows or how you operate it – screens, controls, failure states, setup, configuration – update `README.md`, `docs/using.md`, and `docs/setup.md` in the same change. They describe the device to someone holding it; if they drift from the firmware, that is a bug.*
+
 ---
 
 ## Where this is now
 
-**2026-09-20.** Running live since 2026-09-04, numbers trustworthy. Everything since has been the display.
+**2026-09-22.** Running live since 2026-09-04, numbers trustworthy. Everything since has been the display. The public writeup is live at [jonplummer.com/sides/usage-chan](https://jonplummer.com/sides/usage-chan/), and README, `using.md`, and `setup.md` were brought up to date with the vertical dashboard, the keypad, and smoke on 2026-09-22.
 
-The dashboard is vertical: two bottom-anchored columns, fill meaning *what is left*, bottom edge meaning exhaustion, a diamond at even-burn pace and a word naming the gap. Extra usage draws as a vessel with a `$` or red `X` straddling the bar's end. The control column carries menu bars, a four-state signal glyph and a refresh indicator that counts down, spins, marks a failure for five seconds and then stays warn-coloured until something works. Two conditions that cannot fix themselves — radio down, or three API failures — veil the screen and put a lozenge on it. PIN entry is a keypad: four taps, not thirty-six.
+The dashboard is vertical: two bottom-anchored columns, fill meaning *what is left*, bottom edge meaning exhaustion, a diamond at even-burn pace and a word naming the gap. Extra usage draws as a vessel with a `$` or red `X` straddling the bar's end. The control column carries menu bars, a four-state signal glyph and a refresh indicator that counts down, spins, marks a failure for five seconds and then stays warn-coloured until something works. Two conditions that cannot fix themselves — radio down, or three API failures — veil the screen and put a lozenge on it. PIN entry is a keypad: four taps, not forty.
 
 `docs/sim/` is the spec. `screens.js` is a line-for-line port of `src/ui.cpp`, so a disagreement is a finding. Icons come from `design/icons/*.png` via `tools/fetch-icons.sh`, which pulls from Figma and regenerates both sides from one set of bits; `tools/verify-icons.js` holds it at zero differing pixels. Type in Figma is the device's own glyphs, via `tools/fonts2ttf.py`.
 
-Open on the display: spinner bars or dots, ghosted or absent signal bands, both in `explore.html` section 7; the smoke icons are placeholders (the 32px ones doubled). Open on the data: the overage allowance resets monthly, 2026-10-01 00:00 UTC, sharing no edge with either window the dashboard draws — so the pace diamond is in the wrong place on the overage bar. Whether that allowance has a ceiling is still unmeasured, and the NVS capture that would answer it waits for the next time this account crosses the wall.
+Open on the display: spinner bars or dots, ghosted or absent signal bands, both in `explore.html` section 7; the smoke icons are placeholders (the 32px ones doubled). Open on the data: the overage allowance resets monthly, and as of 2026-09-24 that is measured rather than assumed — the wire returned `overage-reset: 1790812800`, which is 2026-10-01 00:00:00 UTC. It shares no edge with either window the dashboard draws, so the pace diamond is in the wrong place on the overage bar. The allowance does have a ceiling, and it turns out to be two of them; see the answered question below. What the NVS capture still owes us is the shape of the headers past the wall, which waits for the next time this account crosses it.
 
 Nothing is blocked. The next few moves are small and listed below.
 
@@ -26,7 +28,9 @@ Nothing is blocked. The next few moves are small and listed below.
 - [ ] **Move the signal glyph to the menu.** Its job on the dashboard was the alarm, and the refresh indicator took that over. Decide what takes the middle circle — service status and the parked week strip are both looking for a home.
 - [ ] **Tune the control column.** The glyphs are on the device and the colour is one constant, `C_CTRL`. Decide bars or dots, ghosted or absent, and how far down `C_CTRL` should go.
 - [ ] **Decide what colour a failure is.** The countdown after a failure is warn-coloured now, but the mark and the spinner still draw in `C_CTRL` — so the announcement is quieter than the condition it announces. One constant either way.
-- [ ] **Confirm the `[CAP]` line with your own eyes.** The dump fix is flashed and the device is running it, but the block prints in the first two seconds of boot and nothing remote can read that window (see the settled entry below). `pio device monitor -e stackchan`, then press reset.
+- [x] **Confirm the `[CAP]` line with your own eyes.** Done 2026-09-24: `[CAP] no overage header set captured yet`. The dump fires, and the empty answer is the right one — this account has not crossed the wall while the device was watching. Two things that were written here were wrong. The block does not print "in the first two seconds of boot": `apiDumpOverageCapture()` runs at boot progress 95, after WiFi and NTP, so it landed about ten seconds in, after two association attempts. And the window was never the obstacle — the serial tooling was. See the settled entry below, which still describes the USB-switch problem correctly.
+- [ ] **A single `AUTH_FAIL` does not mean the password is wrong.** Caught in the same 2026-09-24 boot log: the radio reported reason 202 `AUTH_FAIL` at 5.2s and reason 2 `AUTH_EXPIRE` at 9.7s against the home network, then associated and fetched normally. The password was correct throughout. Any setup flow that reads the disconnect reason to tell "wrong password" from "network gone" has to retry before it reports a verdict, because a wrong password is a *consistent* auth failure and a single one is just the first attempt. Worth fixing before the setup rework leans on it — a false "that password is wrong" lands in exactly the moment the rework exists to make trustworthy.
+- [ ] **`api.h` contradicts `api.cpp` about the overage headers.** The struct comment says overage state is unset "unless the account is at the wall" and that "presence of the status header is the signal". `api.cpp:197` says the opposite, at length and correctly: presence means nothing, because `overage-status` rides on ordinary responses too, and the wall is marked by `unified-status: rejected`. Confirmed on the wire 2026-09-24 — `status: allowed overage: status=allowed util=0.0` while nowhere near the wall. The code is right and the header comment will mislead the next person to read it.
 - [ ] **Fix the diamond on the overage bar.** It is placed by the base window's elapsed fraction, and the bar underneath it is filling against a month. Either derive the monthly elapsed fraction (the reset is the first of the month, so the start is the first of the previous one) or retire the diamond while overage is drawing.
 - [ ] **Decide the sub-12% headline word.** `nearly out` is 116px in a 102px slot. `explore.html` section 5 offers `very low` (96px), `low` (40px), or keeping the number.
 - [ ] **Decide what to do about `tools/readboot.py`.** Run now, and it does not do the job it was written for — it reaches `[HAL]` and stops. Docstring rewritten to say so. Keep it for early-boot problems, or delete it.
@@ -51,7 +55,7 @@ Track A is currently in flight and is deliberately independent of all of it.
 
 claude-usage-stick already has this, in `panel.cpp` and `panel_html.h` (~1,100 lines, MIT). It was dropped when reducing to the single-screen path, and it is the single largest win available.
 
-It serves a control panel over the home WiFi at `http://<devicename>.local` or the IP. The login is the same 4-digit PIN, and logging in **also unlocks the device**, so you type the PIN in a browser instead of tapping a digit up to 36 times. It carries brightness, refresh interval, timezone, device name, screen flip, WiFi switching, and a factory reset armed by typing `ERASE`.
+It serves a control panel over the home WiFi at `http://<devicename>.local` or the IP. The login is the same 4-digit PIN, and logging in **also unlocks the device**, so after a reboot or a flash you can unlock it from a laptop or phone without reaching for the screen. It carries brightness, refresh interval, timezone, device name, screen flip, WiFi switching, and a factory reset armed by typing `ERASE`.
 
 The part that matters most: it can **replace the stored token without a factory reset** — it re-encrypts, swaps live, and test-drives the new token against the API for a verified/failed verdict. That closes the token-expiry problem, which otherwise arrives in a year as a dead device.
 
@@ -72,7 +76,7 @@ Four things went wrong in practice, in order of severity:
 
 1. **Joining the setup AP drops you off the internet**, so the token has to already be on your clipboard before you switch networks. Nothing on screen or in the portal says so. This was the worst moment in the flow.
 2. **The AP password has to be read off the screen and typed into a phone.**
-3. **PIN entry is up to 36 taps** — ten per digit worst case, plus confirms.
+3. ~~**PIN entry is up to 40 taps** — nine per digit worst case, plus a confirm each.~~ Fixed 2026-09-20 by the on-screen keypad: four taps, and the fourth submits.
 4. **After setup, nothing tells you where the device is on the LAN.** Moot until the panel exists, then immediately relevant.
 
 `M5GFX` has `lcd.qrcode()` built into `LGFXBase`, so a QR code costs no library and no meaningful flash. That makes fixes 2 and 4 nearly free:
@@ -82,7 +86,7 @@ Four things went wrong in practice, in order of severity:
 - A line at the top of the portal page: *copy your token before joining this network*. One sentence in `provision.cpp`'s HTML, and it is the cheapest fix of the four.
 - Later, the device's LAN address as a QR on the dashboard, once there is something at that address worth reaching.
 
-Fix 3 is largely solved by the panel (type the PIN in a browser), and fully solved by an on-screen keypad — see parked ideas.
+Fix 3 is done – the keypad shipped 2026-09-20 (see the decision log). The panel will add a second way in: unlocking from a browser.
 
 ### Phase 2 (optional) – Stack-Chan's own capabilities
 - [ ] Swap the plain bars for a face through M5Stack-Avatar, expression driven by five-hour utilization and burn rate
@@ -175,7 +179,7 @@ The key is the interesting one: a legend for a display that deliberately has no 
 
 - **Ease the token handoff.** Joining the setup AP drops your phone or laptop off the internet, so the token has to be already copied before you switch networks. A QR code on the device pointing at `http://192.168.4.1`, and a note on the setup page telling you to copy the token first, would cover most of the pain
 - **Use `M5.BtnPWR`.** A real physical input sitting unused. "Refresh now" fits it, and would free the middle touch zone
-- **A real PIN keypad.** ~~Four digits at one-tap-per-increment is up to 36 taps.~~ Built 2026-09-20; see the decision log.
+- **A real PIN keypad.** ~~Four digits at one-tap-per-increment is up to 40 taps.~~ Built 2026-09-20; see the decision log.
 - **Token expiry.** `claude setup-token` tokens last a year. Largely solved by the panel's token replacement; a countdown from a stored issue date would still warn before the device simply stops
 - **Sleep or dim on a schedule.** A lit 320x240 panel on a nightstand at 2am is a lot
 - **Respond to ambient light.** The CoreS3 carries an LTR-553 light and proximity sensor on its front panel, and M5Unified may already expose it. Auto-brightness would answer the schedule item above and the "dimmest dot is still too dim / too bright" tuning at once. Fancy, so it belongs to a polish pass, and it is unverified whether the Stack-Chan shell leaves the sensor uncovered
@@ -185,7 +189,7 @@ The key is the interesting one: a legend for a display that deliberately has no 
 
 ## Open questions
 
-- **Does the overage allowance have a ceiling?** If extra usage is uncapped there is no denominator, the vessel has no length, and the right display is the uncapped fallback in `explore.html` section 4. The `allowed_warning` status implies a cap exists; nothing proves one.
+- **~~Does the overage allowance have a ceiling?~~ Answered 2026-09-24, and there are two.** Claude.ai's billing page shows an unspent **credit balance** and a separate **monthly spending limit**, with spend-to-date against that limit and an auto-reload toggle. On this account that day: $62.70 unspent, a $100 limit, $15.22 spent, credits on, auto-reload off. So the vessel has a denominator, but it is the *lesser of two numbers* rather than one — real headroom there was $62.70, not the $84.78 the limit alone implies. Turning auto-reload on takes the credit balance out of the running and leaves the monthly limit as the only ceiling, which means the denominator changes meaning based on a setting the device cannot see. Open follow-on: the device read `overage-utilization: 0.0` that same day while the account showed $15.22 spent, so that header is **not** spend-against-limit, or it only moves once past the wall. Neither number is in any header we collect, so the device cannot draw a dollar figure — only the fraction, once we know what its denominator is.
 - **Does `overage-utilization` climb past 1.0, and does `5h-utilization` peg at 1.0 past the wall or keep going?** The NVS capture exists to answer both. It answers them the next time this account crosses the wall.
 - **Switch to `/api/oauth/usage`, or read both?** Reading both gives the Opus and Sonnet breakdown *and* `representative-claim`. Costs one extra request.
 - **Does a `claude setup-token` token carry the `user:profile` scope** that `/api/oauth/usage` wants? Sources conflict, and two attempts to test returned 429 rather than an auth verdict — the test itself is rate-limited.
@@ -209,7 +213,7 @@ The radio gets ten seconds' grace before it counts. ESP32 links drop and come ba
 The veil is one `fillRectAlpha` call because every frame is composed into a sprite and pushed once — a decision made on day one for an entirely unrelated reason.
 
 ### 2026-09-20 — A real PIN keypad
-Ten targets instead of one. Up to 36 taps became four. The old screen dialled each digit with BtnA/BtnB, which was fine when the device booted once and is not fine when every flash is a reboot and every reboot is a PIN. Parked since 2026-09-04; unparked because the cost finally landed on the person building it.
+Ten targets instead of one. Up to 40 taps became four. The old screen dialled each digit with BtnA/BtnB, which was fine when the device booted once and is not fine when every flash is a reboot and every reboot is a PIN. Parked since 2026-09-04; unparked because the cost finally landed on the person building it.
 
 96x46 keys, three across and four down, no confirm key — the fourth digit submits. Four dots fill as digits land and no digit is ever shown; the old screen only showed one because a +1 button gave you no other way to know what you were dialling.
 
@@ -332,6 +336,9 @@ Turn an already-owned Stack-Chan (M5Stack CoreS3) into a standalone desk device 
 - [x] Run it for a few real days and watch for drift, or for the headers going away
 
 ### Milestones
+
+#### 2026-09-22 — Writeup published
+The public account of the project is live at [jonplummer.com/sides/usage-chan](https://jonplummer.com/sides/usage-chan/): the vertical layout, extra usage, the simulator, device fonts in Figma, the icon pipeline, the control column, smoke, the keypad, and working with Claude.
 
 #### 2026-09-04 — First flash succeeded
 Booted, provisioned, drawing live bars. The M5GFX >= 0.2.27 diagnosis holds on real hardware, which was the one thing that could only be confirmed here.
