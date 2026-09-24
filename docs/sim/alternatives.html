@@ -1,0 +1,267 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Usage-Chan sim · ten alternatives</title>
+<link rel="stylesheet" href="sim.css">
+<script src="fonts.js"></script>
+<script src="lgfx.js"></script>
+<script src="icons.js"></script>
+<script src="screens.js"></script>
+<script src="dashboard-alternatives.js"></script>
+<style>
+  .grid canvas{width:100%;height:auto}
+  .cell.shipped h3{color:var(--accent)}
+  .statehead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .statehead h2{margin:0}
+  .statehead .why{font-size:12.5px;color:var(--ink-dim);font-family:var(--mono)}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">usage-chan · simulator · exploring, not decided</div>
+    <h1>Ten alternative main views</h1>
+    <p class="lede">Ten different ideas for the one screen, not ten arrangements
+    of two bars. Every one carries the same checklist — both windows, which one
+    binds, both reset moments, pace, the headline ladder, extra usage in all
+    three of its states, whether the data is real, liveness, failure, the
+    dying-battery warning, and a way into the menu — or says where it dropped
+    something and why. Drawn through <code>lgfx.js</code> with the device's own
+    glyph data, so every string measures what it will measure on the panel.
+    Nothing here is committed to <code>screens.js</code> or
+    <code>src/ui.cpp</code>; the reasoning and the coverage table are in
+    <code>PLAN-dashboard-alternatives.md</code>.</p>
+  </header>
+
+  <section class="stage">
+    <div>
+      <h2>The ten, live</h2>
+      <p>The shipped dashboard is first, for comparison. Drag the sliders and
+      watch which layouts hold their shape and which twitch. The pace
+      thresholds, the pace words, the diamond, the cross, the smoke overlay and
+      the control column are all called out of <code>screens.js</code> rather
+      than re-typed, so a change to the shipped vocabulary moves all eleven
+      screens at once.</p>
+      <div class="grid" id="live"></div>
+    </div>
+    <div class="controls">
+      <div class="ctl"><label for="util">5h utilization <b id="utilv"></b></label>
+        <input type="range" id="util" min="0" max="100" value="34"></div>
+      <div class="ctl"><label for="el">5h elapsed <b id="elv"></b></label>
+        <input type="range" id="el" min="0" max="100" value="52"></div>
+      <div class="ctl"><label for="u7">7d utilization <b id="u7v"></b></label>
+        <input type="range" id="u7" min="0" max="100" value="31"></div>
+      <div class="ctl"><label for="e7">7d elapsed <b id="e7v"></b></label>
+        <input type="range" id="e7" min="0" max="100" value="46"></div>
+      <label class="check"><input type="checkbox" id="bind"> 7-day is the binding limit</label>
+      <label class="check"><input type="checkbox" id="ok" checked> data is valid</label>
+      <label class="check"><input type="checkbox" id="stale"> last fetch failed</label>
+      <div class="ctl"><label>smoke overlay</label>
+        <div class="seg" id="smoke">
+          <button data-v="0" aria-pressed="true">none</button>
+          <button data-v="1">no wifi</button>
+          <button data-v="2">API down</button></div></div>
+      <label class="check"><input type="checkbox" id="ovon"> extra usage active</label>
+      <div class="ctl"><label>overage-status</label>
+        <div class="seg" id="ovst">
+          <button data-v="allowed" aria-pressed="true">allowed</button>
+          <button data-v="allowed_warning">warning</button>
+          <button data-v="rejected">rejected</button></div></div>
+      <div class="ctl"><label>allowance left <b id="ovremv"></b></label>
+        <input type="range" id="ovrem" min="0" max="100" value="19"></div>
+      <div class="ctl"><label>battery <b id="batv"></b></label>
+        <input type="range" id="bat" min="0" max="100" value="64"></div>
+      <div class="ctl"><label>on power?</label>
+        <div class="seg" id="power">
+          <button data-v="mains" aria-pressed="true">mains</button>
+          <button data-v="battery">battery</button>
+          <button data-v="unknown">unknown</button></div></div>
+      <div class="ctl"><label>solo: other window shows up within <b id="sthv"></b></label>
+        <input type="range" id="sth" min="0" max="60" value="15"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="statehead">
+      <h2>Hard state · nearly out</h2>
+      <span class="why">8% left, the sub-12% warning word — 116px in the shipped
+      layout's 102px slot</span>
+    </div>
+    <p>The state the shipped screen has a known text-fitting problem in. Look
+    for a slot wide enough to hold a warning without shrinking the type, and
+    for whether the headline ladder's swap from a percentage to a clock still
+    reads as the same screen.</p>
+    <div class="grid" id="low"></div>
+  </section>
+
+  <section>
+    <div class="statehead">
+      <h2>Hard state · blocked, with a reason</h2>
+      <span class="why">extra usage rejected, <code>payment_failed</code> on the
+      wire — the longest string the screen ever holds, at the worst moment</span>
+    </div>
+    <p>Three facts arrive together that no other state carries: a status word,
+    a monthly reset that shares no edge with either window, and a free-text
+    reason. The layouts that treat time as the organising axis have somewhere
+    to put the orphan reset; the ones built on the geometry of a window's edges
+    do not.</p>
+    <div class="grid" id="blocked"></div>
+  </section>
+
+  <section>
+    <div class="statehead">
+      <h2>Hard state · stale behind a failing refresh</h2>
+      <span class="why">good numbers, 14m old, every attempt since has failed</span>
+    </div>
+    <p>The failure this project exists to make visible. The countdown ring
+    carries the standing condition as a colour, but the layout still owes a
+    place to say the numbers are old — and that place cannot be the numbers.</p>
+    <div class="grid" id="stalegrid"></div>
+  </section>
+
+  <section>
+    <div class="statehead">
+      <h2>The pile-up</h2>
+      <span class="why">8% left, on battery at 6%, blocked with a reason, stale
+      behind a failing refresh</span>
+    </div>
+    <p>Everything bad at once, which is the only test that separates a layout
+    with room for bad news from one with room for a single piece of it. None of
+    these draws the battery warning as smoke: the overlay's own rule is that it
+    scales with how much of the screen it invalidates, and a dying battery
+    invalidates nothing — the numbers behind it are exactly as true as they
+    were a minute ago. What it invalidates is the screen's future, which earns
+    something permanent rather than something modal. Each layout answers in its
+    own vocabulary, and the answers are deliberately not the same.</p>
+    <div class="grid" id="pile"></div>
+  </section>
+
+  <section>
+    <div class="statehead"><h2>Where the battery warning went, layout by layout</h2></div>
+    <div class="notes">
+      <dl>
+        <dt>Dial</dt><dd>The instrument's bezel. A dial has a rim and nothing else was using it.</dd>
+        <dt>Tide</dt><dd>Sediment at the bottom of the tank. No margin exists, so the warning joins the object.</dd>
+        <dt>Face</dt><dd>The ahoge wilts and reddens. The only layout where the picture itself can carry it.</dd>
+        <dt>Verdict</dt><dd>It takes the one loud slot: the verdict becomes <em>plug in</em>, and the usage verdict demotes to a line. Only when we know the device is on battery — on an unreadable charge state the warning joins the marginalia rather than taking the slot on a guess.</dd>
+        <dt>Board</dt><dd>One more row, and the row pitch shrinks to fit it. The cheapest answer of the ten, right up until the table is full.</dd>
+        <dt>Agenda</dt><dd>A row at the top, because it is the soonest thing that happens. No runtime is invented: <em>soon</em> is what the gauge honestly supports.</dd>
+        <dt>Gap gauge</dt><dd>Bolted to the top edge. A gauge of one relationship has no spare geometry, and anything on the scale would read as part of the measurement.</dd>
+        <dt>Grid</dt><dd>The left gutter, which already exists for marks about the field rather than in it. A lit cell would read as a unit of budget.</dd>
+        <dt>Horizon</dt><dd>A marked moment on the shared axis, left of both reset ticks — the picture ends before either arrives. Position is nominal and labelled, not measured.</dd>
+        <dt>Solo</dt><dd>It takes the top-right line the other window had, and the other window falls back to its strip. The trade Solo claims it can afford, drawn.</dd>
+      </dl>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const T = SCREENS.SHIPPED;
+  const g = new LGFX();
+  const segOf = id => $(id).querySelector('[aria-pressed="true"]').dataset.v;
+
+  // The shipped dashboard leads every grid, so each alternative is read
+  // against the thing it would replace rather than against the others.
+  const ENTRIES = [['shipped', 'Two vertical columns, the binding one wide.', SCREENS.dashboard]]
+    .concat(DASHALTS.list);
+
+  function buildGrid(hostId) {
+    const host = $(hostId);
+    return ENTRIES.map(([title, blurb, fn]) => {
+      const d = document.createElement('div');
+      d.className = 'cell' + (title === 'shipped' ? ' shipped' : '');
+      d.innerHTML = '<h3>' + title + '</h3>';
+      const c = document.createElement('canvas');
+      d.appendChild(c);
+      const p = document.createElement('p'); p.textContent = blurb; d.appendChild(p);
+      host.appendChild(d);
+      return { c, fn };
+    });
+  }
+
+  const GRIDS = {
+    live: buildGrid('live'),
+    low: buildGrid('low'),
+    blocked: buildGrid('blocked'),
+    stale: buildGrid('stalegrid'),
+    pile: buildGrid('pile'),
+  };
+
+  // Plausible values throughout: a real 5-hour window part-spent, a week
+  // part-spent, the durations the device shows while it has no timezone.
+  function base() {
+    return {
+      ok: true, h5: 34, e5: 0.52, d7: 31, e7: 0.46,
+      reset5: 'in 2h 24m', reset7: 'in 4d 6h',
+      sevenBinds: false, rssi: -55, batPct: 64, power: 'mains',
+      ageTxt: '47s', err: '', fetching: false, pollFrac: 0.62, spinPhase: 1,
+      refreshFailed: false, refreshFailing: false, smoke: 0,
+      at5: 144, at7: 6120, atOv: 14400, soloThresh: 0.15,
+    };
+  }
+
+  function liveState() {
+    const s = base();
+    s.h5 = +$('util').value; s.e5 = $('el').value / 100;
+    s.d7 = +$('u7').value; s.e7 = $('e7').value / 100;
+    s.sevenBinds = $('bind').checked;
+    s.ok = $('ok').checked;
+    s.err = $('stale').checked ? 'http_-1' : '';
+    s.ageTxt = $('stale').checked ? '14m' : '47s';
+    s.refreshFailing = $('stale').checked;
+    s.smoke = +segOf('smoke');
+    s.batPct = +$('bat').value;
+    s.power = segOf('power');
+    s.soloThresh = $('sth').value / 100;
+    if ($('ovon').checked) {
+      s.overage = { active: true, status: segOf('ovst'),
+                    remaining: $('ovrem').value / 100, resetTxt: 'in 10d',
+                    disabledReason: segOf('ovst') === 'rejected' ? 'payment_failed' : null };
+      s.h5 = 100;
+    }
+    return s;
+  }
+
+  const LOW = Object.assign(base(), { h5: 92, e5: 0.74, reset5: 'in 1h 12m' });
+  const BLOCKED = Object.assign(base(), {
+    h5: 100, e5: 0.81, d7: 88, e7: 0.7, reset5: 'in 58m',
+    overage: { active: true, status: 'rejected', remaining: 0,
+               resetTxt: 'in 10d', disabledReason: 'payment_failed' },
+  });
+  const STALE = Object.assign(base(), {
+    ageTxt: '14m', err: 'http_-1', refreshFailing: true, pollFrac: 0.31,
+  });
+  const PILE = Object.assign(base(), {
+    h5: 92, e5: 0.74, d7: 88, e7: 0.7, reset5: 'in 1h 12m',
+    batPct: 6, power: 'battery',
+    ageTxt: '14m', err: 'http_-1', refreshFailing: true, pollFrac: 0.31,
+    overage: { active: true, status: 'rejected', remaining: 0,
+               resetTxt: 'in 10d', disabledReason: 'payment_failed' },
+  });
+
+  function paint(cells, st) {
+    for (const cell of cells) { cell.fn(g, T, st); g.blit(cell.c, 2); }
+  }
+
+  function render() {
+    ['util', 'el', 'u7', 'e7', 'ovrem', 'bat', 'sth'].forEach(k => {
+      const b = $(k + 'v'); if (b) b.textContent = $(k).value + '%';
+    });
+    paint(GRIDS.live, liveState());
+  }
+
+  document.querySelectorAll('input[type=range], input[type=checkbox]').forEach(i =>
+    i.addEventListener('input', render));
+  document.querySelectorAll('.seg').forEach(seg => seg.addEventListener('click', ev => {
+    const b = ev.target.closest('button'); if (!b) return;
+    [...seg.children].forEach(x => x.setAttribute('aria-pressed', x === b));
+    render();
+  }));
+
+  render();
+  paint(GRIDS.low, LOW);
+  paint(GRIDS.blocked, BLOCKED);
+  paint(GRIDS.stale, STALE);
+  paint(GRIDS.pile, PILE);
+})();
+</script>

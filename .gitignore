@@ -19,3 +19,8 @@ reference/
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Claude Code: launch.json is shared (docs/sim/README.md points at it),
+# the rest is per-machine or scratch.
+.claude/settings.local.json
+.claude/worktrees/

@@ -10,6 +10,18 @@ What it cannot show: the backlight, the IPS panel's viewing angle, and how the w
 |---|---|
 | `dashboard.html` | The shipped dashboard, one screen, every state on sliders. Compare it against the device before trusting the rest |
 | `lookfeel.html` | Candidates side by side: the dashboard in every small face, then the menu, PIN entry, and the interstitials (boot, setup, connecting, lockout, error) in Font2 beside a candidate face you choose. Label case, headline face, and the candidate are switches; the sliders drive every dashboard at once |
+| `sketches.html` | Five candidates each for three screens that do not exist yet — the status panel the menu becomes, the legend, and the settings-URL screen. One control panel drives all fifteen, including the degraded states. Reasoning in `docs/exploration-screen-sketches.md` |
+| `alternatives.html` | Ten alternative main views, drawn against the same data the shipped dashboard carries, plus four fixed grids showing every layout in the hard states. Exploration rather than proposals — the vertical bars are staying. Reasoning and the coverage table in `docs/exploration-dashboard-alternatives.md` |
+
+Two of these pages come with checkers rather than eyeballs:
+
+```bash
+node docs/sim/check-alternatives.js   # every layout x every state, measures each string
+node tools/qr-check.js                # proves the sketched QR codes round-trip
+node tools/render-sketches.js         # writes every sketch to build/sketch-out/*.png
+```
+
+`check-alternatives.js` is the one worth running after any change to `screens.js`: it reports the four strings the shipped dashboard currently overflows in its 102px headline slot.
 
 ## Running it
 

@@ -1,0 +1,268 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Usage-Chan sim · screen sketches</title>
+<link rel="stylesheet" href="sim.css">
+<script src="fonts.js"></script>
+<script src="lgfx.js"></script>
+<script src="icons.js"></script>
+<script src="screens.js"></script>
+<script src="qr.js"></script>
+<script src="sketch-variants.js"></script>
+<style>
+  .grid canvas{width:100%;height:auto}
+  .cell .tgt{font-family:var(--mono);font-size:11px;color:var(--accent);margin:0}
+  .warnbox{border-left:2px solid #D9564F;padding-left:14px}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">usage-chan · simulator · candidates, nothing decided</div>
+    <h1>Status panel, legend, settings URL</h1>
+    <p class="lede">Five approaches each for three screens that do not exist yet.
+    Drawn through <code>lgfx.js</code> and the device's own glyph bitmaps, so
+    every string measures what it will measure on the panel. Nothing here is
+    committed to <code>screens.js</code> or <code>src/ui.cpp</code>; neither
+    file was touched. The controls on the right drive all fifteen at once.</p>
+  </header>
+
+  <section class="stage">
+    <div>
+      <h2>1 · The status panel</h2>
+      <p>Seven readings, one control, two destinations, and a close, on a
+      screen where <code>ui.cpp</code> records that four 46px rows fit 240px
+      and five do not. The crowding is the design problem, and these are five
+      different answers to it rather than five spacings of one.</p>
+      <p>The one number that decides most of it: <strong>46px is a touch
+      floor, not a layout unit.</strong> It is a rule about things you hit. A
+      line of Font2 you only read costs 16px and owes nobody 7mm. So the budget
+      is three targets at 46px and everything else in what is left.</p>
+      <p>Two things are fixed in every variant. The close control sits at
+      <code>V_CTRL_X, V_CIRCLE_Y0</code> — exactly where the dashboard's
+      hamburger is — in the same 56x56 zone, so the thing you tapped to get in
+      is the thing you tap to get out, in the same pixels. And brightness is
+      <code>drawBrightnessDots</code> copied, not redesigned: five dots on a
+      36px pitch, the live one filled.</p>
+      <div class="grid" id="panelgrid"></div>
+    </div>
+    <div class="controls">
+      <div class="ctl"><label>state</label>
+        <div class="seg" id="state">
+          <button data-v="ok" aria-pressed="true">healthy</button>
+          <button data-v="bad">degraded</button></div></div>
+      <div class="ctl"><label>power</label>
+        <div class="seg" id="power">
+          <button data-v="auto" aria-pressed="true">follow state</button>
+          <button data-v="mains">on power</button>
+          <button data-v="battery">on battery</button>
+          <button data-v="unknown">cannot tell</button></div></div>
+      <label class="check"><input type="checkbox" id="gauge" checked> battery gauge readable</label>
+      <div class="ctl"><label for="bright">brightness <b id="brightv">3</b></label>
+        <input type="range" id="bright" min="0" max="4" value="3"></div>
+      <p style="font-size:12.5px;color:var(--ink-dim);margin:0">Degraded is
+      timezone unset, <code>http_529</code> twice in a row, overage rejected
+      for <code>payment_failed</code>, a weak radio, and the cable out.</p>
+    </div>
+  </section>
+
+  <section class="notes warnbox">
+    <h2>Not yet honest</h2>
+    <dl>
+      <dt>Claude service status</dt>
+      <dd>Every variant that draws <em>no service issues</em> is drawing a
+      <strong>stub</strong>. The device says it without asking anyone —
+      <code>plan.md</code> lists it under Stubs and IOUs, and
+      <code>design-decisions.md</code> has the design it is waiting for: detect
+      with our own request outcomes, name and confirm with
+      <code>status.claude.com</code>'s <code>components.json</code>. Until that
+      exists, this line is a lie with a pleasant tone. <strong>Pared</strong>
+      is the only variant that does not tell it, which is the same claim made
+      by deletion.</dd>
+      <dt>battery, and the three states of charging</dt>
+      <dd><code>halBatPercent()</code> returns -1 when the gauge cannot be
+      read, so the unreadable case draws the words and an empty outline with a
+      dash through it — never a partly filled cell that looks like a reading.
+      <code>halIsCharging()</code> returns an enum with an unknown value, so
+      there are three states, not two. On mains with a working gauge, every
+      variant says <strong>nothing at all</strong>: this device lives plugged
+      in, so the charge level is meaningless almost always and sharply relevant
+      on the day the cable gets knocked out.</dd>
+    </dl>
+  </section>
+
+  <section class="stage">
+    <div>
+      <h2>2 · The legend</h2>
+      <p>A key for a display that deliberately carries no labels. It has to say
+      what the fill means (what is <em>left</em>), what the bottom edge means
+      (exhaustion and the reset, which are the same edge), what the diamond
+      means, what the colours mean, and what the vessel and its
+      <code>$</code>/<code>X</code> mean.</p>
+      <p><strong>Real bar</strong> is the version <code>plan.md</code> parks,
+      built to settle it rather than argue it. Read the verdict under the
+      grid.</p>
+      <div class="grid" id="legendgrid"></div>
+      <div class="notes warnbox">
+        <h2>Verdict on the annotated real bar</h2>
+        <p><code>plan.md</code> says it either works immediately or not at all.
+        It does not work.</p>
+        <p>Two gutters, 123px on the left and 130px on the right, and Font2
+        spends 130px in about seventeen characters. Every callout is three or
+        four lines. Three of the five facts — empty, the reset, and where the
+        token sits — are the same edge, so they collapse into one callout with
+        an L-shaped leader; separate captions at y=224 run off the bottom.
+        That is survivable.</p>
+        <p>What is not survivable is that the bar contradicts the callouts.
+        Switch the state control to <strong>degraded</strong>: the 5-hour
+        window is at the wall with overage rejected, so the bar is an empty
+        vessel with a red ring, and <em>this much is left, not spent</em> is
+        pointing at nothing, next to <em>the colour says how far ahead of pace
+        you are</em> pointing at no colour. In the healthy state it is the
+        other half that is empty — no token exists, so the
+        <code>$</code>/<code>X</code> callout points at bare background.
+        <strong>The legend is incomplete in every state, and wrong in at least
+        one.</strong> Verité is the appeal and it is also the defect: a legend
+        has to explain the states you are not in.</p>
+      </div>
+    </div>
+    <div class="controls">
+      <p style="font-size:12.5px;color:var(--ink-dim);margin:0">Driven by the
+      same state control above. Degraded puts the 5-hour window at the wall
+      with overage rejected, which is the only state in which the real bar has
+      a token to point at.</p>
+    </div>
+  </section>
+
+  <section class="stage">
+    <div>
+      <h2>3 · The settings URL</h2>
+      <p>The device name comes from <code>slugifyHostname()</code>, so the
+      address is <code>http://usage-chan.local</code> — but mDNS fails on
+      plenty of home networks, so the raw IP has to be readable too.</p>
+      <p>Two facts fix the frame before any variant.
+      <code>LGFXBase::qrcode</code> fills a <strong>white</strong> box and
+      draws black modules: the palette does not reach it, so a QR is always a
+      white card on the warm black. And its <code>margin</code> argument
+      <strong>defaults to false</strong>, which leaves only the
+      <code>w / size</code> rounding remainder as a quiet zone. Every call here
+      passes <code>true</code>; the measured result is printed under the
+      grid.</p>
+      <div class="grid" id="urlgrid"></div>
+      <div class="notes" id="qrnotes"></div>
+    </div>
+    <div class="controls">
+      <p style="font-size:12.5px;color:var(--ink-dim);margin:0">The codes are
+      real and scannable. They use mask 0, declared in the format bits, where
+      the device's own encoder picks the lowest-penalty mask — same version,
+      same module count, same box, different speckle.</p>
+    </div>
+  </section>
+
+  <section class="notes">
+    <h2>Reading this page</h2>
+    <dl>
+      <dt>why no variant uses 34px rows</dt>
+      <dd>34px on this panel is about 5.4mm and missed on hardware; 46px is
+      ~7.3mm and works. The comment above <code>MENU_TOP</code> records it and
+      <code>design-decisions.md</code> repeats it. Shrinking the rows is the
+      one solution to the crowding that is already known to fail.</dd>
+      <dt>where the fifth row came from</dt>
+      <dd><em>Pared</em> puts five 46px slots on the screen, which
+      <code>ui.cpp</code> says does not fit. It fits because the version header
+      is gone: 5 x 46 = 230 of 240, and the "tap outside to close" text that
+      used to occupy the top-right corner has been replaced by a close control
+      that sits in the hamburger's own zone.</dd>
+      <dt>what the target sizes are</dt>
+      <dd>Rows are 46px tall — ~7.3mm — and 246 to 296px wide. Brightness dots
+      own 36 x 46, ~5.7 x 7.3mm, which is <code>ui.cpp</code>'s own geometry.
+      Close and back each own 56 x 56, ~8.9 x 8.9mm. The split destination
+      rows are 136 x 46, ~21.6 x 7.3mm.</dd>
+    </dl>
+  </section>
+</div>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const T = SCREENS.SHIPPED;
+  const g = new LGFX();
+
+  function cell(parent, title, note, fn) {
+    const d = document.createElement('div'); d.className = 'cell';
+    const c = document.createElement('canvas');
+    d.innerHTML = '<h3>' + title + '</h3>';
+    d.appendChild(c);
+    const p = document.createElement('p'); p.innerHTML = note; d.appendChild(p);
+    parent.appendChild(d);
+    return { c, fn };
+  }
+
+  const PANELS = [
+    ['1 · ledger', 'Readings are a table at Font2’s own 16px pitch; targets are rows. Seven lines cost it the full-width destination rows — they had to split. Targets: brightness 280x46, two destinations 136x46.', SKETCH.panel.ledger],
+    ['2 · column', 'The glyph IS the reading: wifi and the refresh ring keep their dashboard y and carry no caption, because the rows have to reach x=258 and the glyphs sit inside that band. The SSID goes to the web panel. Battery takes the slot above, only when it has something true to say. Targets: three rows 246x46; the label is “Light” because 246px cannot hold “Brightness” plus five dots.', SKETCH.panel.column],
+    ['3 · headline', 'One verdict at 18pt answering “is this thing working”, four dim lines of evidence, a brightness row and a split destination row. Battery goes at the head of the evidence, not beside the verdict \u2014 \u201c2 failures\u201d at 18pt is 180px wide and the chip landed on it. Targets: 280x46 and two 136x46.', SKETCH.panel.headline],
+    ['4 · sentences', 'The readings as prose, because half of them are only worth saying as a relationship. The destinations are sentences too, and a tappable sentence gets a 46px line. Targets: 296x46 brightness, two 288x46 sentences.', SKETCH.panel.sentences],
+    ['5 · pared', 'Four readings dropped, five 46px slots, two of them readings and three of them targets. Battery goes on the second line inside the wifi card. Targets: three rows, 246x46 and 296x46.', SKETCH.panel.pared],
+  ].map(([t, n, fn]) => cell($('panelgrid'), t, n, fn));
+
+  const LEGENDS = [
+    ['1 · real bar', 'The parked idea: the shipped bar at its shipped values, annotated in place. Back 56x56 top left, close 56x56 top right.', SKETCH.legend.realbar],
+    ['2 · diagram', 'A schematic bar, smaller than the real one, with numbered callouts stacked beside it. Gives up vérité to buy room to point.', SKETCH.legend.diagram],
+    ['3 · key', 'No bar at all — the marks themselves beside the sentences, the way a map legend works.', SKETCH.legend.key],
+    ['4 · panes', 'Colour is one question and shape is another. Two cards, one line of gloss each, fewer words than anything else here.', SKETCH.legend.panes],
+    ['5 · scrim', 'The real dashboard under the smoke overlay’s own fillRectAlpha, annotated where the things actually are.', SKETCH.legend.scrim],
+  ].map(([t, n, fn]) => cell($('legendgrid'), t, n, fn));
+
+  const URLS = [
+    ['1 · QR dominant', 'One code as big as the screen allows, the name under it, the address under that.', SKETCH.url.dominant],
+    ['2 · split', 'Code left, address block right, so the two ways in sit side by side.', SKETCH.url.split],
+    ['3 · two codes', 'mDNS fails often enough that the fallback is scannable rather than typed. The cost is module size — see below.', SKETCH.url.two],
+    ['4 · text first', 'The address big enough to read across a desk and type, with the code reduced to a corner.', SKETCH.url.text],
+    ['5 · stepped', 'Two numbered steps, because the PIN unlocking the device too is what makes the trip to a phone worth taking.', SKETCH.url.stepped],
+  ].map(([t, n, fn]) => cell($('urlgrid'), t, n, fn));
+
+  function segVal(id) { return $(id).querySelector('[aria-pressed="true"]').dataset.v; }
+
+  function state() {
+    const bad = segVal('state') === 'bad';
+    const s = Object.assign({}, bad ? SKETCH.DEGRADED : SKETCH.NOMINAL);
+    const p = segVal('power');
+    if (p !== 'auto') s.power = p;
+    if (!$('gauge').checked) s.batPct = -1;
+    s.brightness = +$('bright').value;
+    return s;
+  }
+
+  // The QR numbers are a finding, not decoration: thickness is what decides
+  // whether a phone can read the code, and the device's own margin rule drops
+  // a thickness step to buy the quiet zone.
+  function qrNotes() {
+    const rows = Object.entries(SKETCH.QRSTATS).map(([k, v]) =>
+      '<dt>' + k + '</dt><dd>version ' + v.version + ', ' + v.size +
+      ' modules, ' + v.thickness + 'px per module (' +
+      (v.thickness * 0.159).toFixed(2) + 'mm), ' + v.offset +
+      'px of white around it = ' + (v.offset / v.thickness).toFixed(1) +
+      ' modules of quiet zone.' + (v.thickness <= 2
+        ? ' <strong>Too small to scan reliably.</strong>' : '') + '</dd>').join('');
+    $('qrnotes').innerHTML = '<h2>What the codes actually measure</h2><dl>' + rows + '</dl>';
+  }
+
+  function render() {
+    $('brightv').textContent = $('bright').value;
+    const s = state();
+    for (const c of PANELS)  { c.fn(g, T, s); g.blit(c.c, 2); }
+    for (const c of LEGENDS) { c.fn(g, T, s); g.blit(c.c, 2); }
+    for (const c of URLS)    { c.fn(g, T, s); g.blit(c.c, 2); }
+    qrNotes();
+  }
+
+  document.querySelectorAll('input[type=range], input[type=checkbox]').forEach(i =>
+    i.addEventListener('input', render));
+  document.querySelectorAll('.seg').forEach(seg => seg.addEventListener('click', ev => {
+    const b = ev.target.closest('button'); if (!b) return;
+    [...seg.children].forEach(x => x.setAttribute('aria-pressed', x === b));
+    render();
+  }));
+
+  render();
+})();
+</script>
