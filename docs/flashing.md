@@ -131,6 +131,16 @@ If the screen is black but the backlight is on, that is the failure [`display-no
 
 If the serial log is silent, `ARDUINO_USB_CDC_ON_BOOT=1` means the port only appears once the firmware is running, so an empty monitor means it did not get that far. Re-run the upload and watch for an esptool error.
 
+## Test mode
+
+Some states can't be produced on demand, extra usage most of all. The `stackchan-test` build draws canned readings on the dashboard in place of the real ones and steps to the next every six seconds: plenty left, low, nearly out, seven-day binding, then paying, near cap, and blocked on each window. Everything else runs as usual, including WiFi and the PIN.
+
+```
+~/.local/bin/pio run -e stackchan-test -t upload
+```
+
+Each state's name is written to the serial log as it appears (`[TEST] 5/9 5-hour paying`). The states are a table in `testUsage()` in `src/main.cpp`. Flash the plain `stackchan` env to go back; stored settings and the token are untouched.
+
 ## Getting back
 
 Two ways out, in increasing severity:

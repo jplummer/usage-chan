@@ -4,7 +4,7 @@ A Stack-Chan that shows how much of your Claude rate-limit budget is left.
 
 It sits on a desk, polls `api.anthropic.com` every five minutes, and answers one question: *can I start this now, or should I wait?* No host computer, no org API key, no Mac daemon relaying over Bluetooth. The device does it alone.
 
-The dashboard is two columns that fill from the bottom. The fill is what's left, and the bottom edge is the end of your quota. The wide column is whichever window the server says will stop you first – usually the five-hour one – and the thin column beside it is the other. A diamond marks where an even burn would have you right now, and a word beside it says how far off you are, from `well behind` to `well ahead`. Behind pace is calm however little remains; ahead of pace is worth knowing.
+The dashboard is two columns that fill from the bottom. The fill is what's left, and the bottom edge is the end of your quota. The wide column is the five-hour window and the thin column beside it is the seven-day one. A diamond marks where an even burn would have you right now, and a word beside it says how far off you are, from `well behind` to `well ahead`. Behind pace is calm however little remains; ahead of pace is worth knowing.
 
 No face and no servo yet. `plan.md` has the phases, and `docs/design-decisions.md` has the reasoning — including the behavioural research that argued against several things this device used to do.
 

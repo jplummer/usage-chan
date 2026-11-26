@@ -330,30 +330,32 @@ static const char* overageWord(const char* status) {
 // ── Vertical dashboard ────────────────────────────────────
 // Two columns side by side instead of two bars stacked. Each bar fills
 // bottom-up, so its own bottom edge reads as exhaustion the same way the old
-// bar's right edge did. Whichever window the server names as binding gets the
-// wide column and the headline; the other gets the thin one — the same swap
-// the stacked layout did with drawWindowBar/drawSevenDayBar above. A reserved
-// column on the right stays empty on purpose: a fixed-width home for whatever
-// needs one later (signal, the menu button, an update spinner), rather than
-// more text fighting for room on a line that is already full.
-static constexpr int V7_X       = 91,  V7_W  = 24;   // thin (secondary) column
-static constexpr int V5_X       = 123, V5_W  = 48;   // wide (primary) column
-static constexpr int V5_TEXT_X  = 178;                // primary text, left-aligned
-static constexpr int V7_TEXT_R  = 84;                 // secondary text, right-aligned to this x
+// bar's right edge did. The 5-hour window is always the wide bar on the right
+// and the 7-day window always the thin bar on the left. Until 2026-11-10 the
+// window the server named as binding took the wide column, and the swap
+// produced a screen that looked almost the same and meant something else. A
+// reserved column on the right stays empty on purpose: a fixed-width home for
+// whatever needs one later (signal, the menu button, an update spinner),
+// rather than more text fighting for room on a line that is already full.
+static constexpr int V7_X       = 91,  V7_W  = 24;   // thin column: 7-day
+static constexpr int V5_X       = 123, V5_W  = 48;   // wide column: 5-hour
+static constexpr int V5_TEXT_X  = 178;                // wide column's text, left-aligned
+static constexpr int V7_TEXT_R  = 84;                 // thin column's text, right-aligned to this x
 static constexpr int V_CTRL_X   = 278, V_CTRL_W = 42;
-static constexpr int V_TITLE_Y  = 8, V_HEAD_Y = 29, V_FOOT_Y = 216;
+static constexpr int V_TITLE_Y  = 8, V_HEAD_Y = 29, V_FOOT_Y = 224;
+static constexpr int V_SUB_Y    = V_TITLE_Y + 18;   // thin column's amount line
 // The headline sits 2px left of the other rows: Sans Bold carries more left
 // bearing than Font2, so matching the box edges leaves the stems misaligned.
 static constexpr int V_HEAD_KERN = -2;
 static constexpr int V_REASON_Y = V_HEAD_Y + 27;  // third line of the stat block
-static constexpr int V_TRACK_H  = 224;   // both bars, every state: a bar that
+static constexpr int V_TRACK_H  = 240;   // both bars, every state: a bar that
                                          // changes length makes the screen
                                          // twitch exactly when it has something
-                                         // to say, and the 16px it gives up is a
-                                         // permanent home for the reset line and
-                                         // the end-of-bar token.
-// Tokens straddle the track's end edge, centred on it -- the frames put the X
-// across 209..237 and the '$' ink across 210..239 for an edge at 224.
+                                         // to say. Full panel height since
+                                         // 2026-11-10, so the bars stand on the
+                                         // floor of the display.
+// Tokens sit inside the bottom of the track. They straddled its end edge
+// while the track stopped at 224; at 240 half of one would be off the panel.
 static constexpr int V_TOKEN_ARM = 11, V_TOKEN_T = 3, V_TOKEN_RING = 3;
 static constexpr int V_CIRCLE_Y[3] = { 11, 156, 198 };   // menu, signal, refresh
 static constexpr int V_CIRCLE_D    = 32;                 // the frames say 32, not 33
@@ -565,36 +567,31 @@ static void drawRefreshIndicator(int y, bool fetching, float frac, bool failed,
     ctrlWedge(y, frac, col);
 }
 
-// Straddles the track's end edge -- the boundary you just crossed. The ring is
-// C_BG, which separates the token from the bar above it and then vanishes into
-// the background below, so it reads as emerging from the bar's end rather than
-// sitting on top of it. The '$' is placed by its ink, not its box:
-// FreeSansBold18pt7b puts that glyph's 29 rows flush with the box top, so the
-// box goes 29 above the base.
+// Sits inside the bottom of the track, at the end you just reached. The ring
+// is C_BG, which separates the token from the fill around it. The '$' is
+// placed by its ink, not its box: FreeSansBold18pt7b puts that glyph's 29 rows
+// flush with the box top, so the box goes 29 above the base plus a 4px margin.
 static void drawToken(int cx, bool rejected) {
     const uint16_t col = rejected ? C_CRIT : C_PAY;
     if (rejected) {
-        drawMarkX(cx, V_TRACK_H, V_TOKEN_ARM, C_BG, V_TOKEN_T + V_TOKEN_RING);
-        drawMarkX(cx, V_TRACK_H, V_TOKEN_ARM, col,  V_TOKEN_T);
+        drawMarkX(cx, V_TRACK_H - 16, V_TOKEN_ARM, C_BG, V_TOKEN_T + V_TOKEN_RING);
+        drawMarkX(cx, V_TRACK_H - 16, V_TOKEN_ARM, col,  V_TOKEN_T);
     } else {
         g->setFont(&fonts::FreeSansBold18pt7b);
         const int w = g->textWidth("$");
         outlinedGlyph("$", &fonts::FreeSansBold18pt7b, cx - (w >> 1),
-                      V_TRACK_H - 14, col, C_BG, V_TOKEN_RING);
+                      V_TRACK_H - 33, col, C_BG, V_TOKEN_RING);
     }
 }
 
-static int captionY(int tickCy, bool primary, bool showReason = false) {
+// blockBot is the bottom of the title block in this column: the caption's one
+// obstacle above. The reset line is its one obstacle below.
+static int captionY(int tickCy, int blockBot) {
     const int H = 16, lo = 0, hi = V_TRACK_H - H;
     int y = tickCy - (H >> 1);
     if (y < lo) y = lo;
     if (y > hi) y = hi;
     // {top, bottom} of every row that never moves in this column.
-    // Title and headline are one block now, so the caption has one obstacle
-    // above and one below, and its resting place is the row immediately under
-    // the block.
-    const int blockBot = primary ? (showReason ? V_REASON_Y + 16 : V_HEAD_Y + 23)
-                                 : V_TITLE_Y + 16;
     const int avoid[][2] = { { V_TITLE_Y, blockBot },
                              { V_FOOT_Y,  V_FOOT_Y + 16 } };
     for (int i = 0; i < 2; i++) {
@@ -611,33 +608,39 @@ static int captionY(int tickCy, bool primary, bool showReason = false) {
     return y;
 }
 
-// One column. `primary` picks the geometry (wide/right vs thin/left) and how
-// much text rides beside it; `days` puts week dividers on the 7-day bar and
-// none on the 5-hour one, whichever slot each is drawn in. `ov` is the
-// overage source and is only ever passed for the primary column, since extra
-// usage only applies to whichever window is currently binding. Normally the
-// bar runs the full screen height; it only gives up a strip at its own bottom
-// for the paid mark once overage is actually active, rather than paying that
-// cost all the time.
-static void drawVBar(bool primary, const char* label, float util,
+// One column. `wide` picks the slot: the 48px bar on the right with the
+// headline, which is always the 5-hour window, or the 24px bar on the left
+// with one small amount line, which is always the 7-day window. `binds` says
+// the server named this window as the one that will stop you; `ov` is the
+// overage source and is only passed for that window, since extra usage only
+// applies to it. `days` puts day dividers on the 7-day bar.
+//
+// Every row holds one kind of fact in every state: title, amount, pace, and
+// reset time at the foot. Until 2026-11-10 the headline swapped to a bare
+// reset time below 40%, in an orange that could match the other bar.
+static void drawVBar(bool wide, bool binds, const char* label, float util,
                      uint32_t resetEpoch, uint32_t windowSec, bool valid, int days,
                      const UsageData* ov) {
-    const int trackX = primary ? V5_X : V7_X;
-    const int trackW = primary ? V5_W : V7_W;
-    const int textX  = primary ? V5_TEXT_X : V7_TEXT_R;
-    const textdatum_t td = primary ? top_left : top_right;
+    const int trackX = wide ? V5_X : V7_X;
+    const int trackW = wide ? V5_W : V7_W;
+    const int textX  = wide ? V5_TEXT_X : V7_TEXT_R;
+    const textdatum_t td = wide ? top_left : top_right;
 
-    const bool overage  = primary && ov && ov->overageActive;
+    const bool overage  = ov && ov->overageActive;
     const bool rejected = overage && strcmp(ov->overageStatus, "rejected") == 0;
-    const bool showReason = rejected && ov->overageDisabledReason[0];
+    // The thin column has no room for the reason: "out of credits" is 88px
+    // and the slot is 84.
+    const bool showReason = wide && rejected && ov->overageDisabledReason[0];
     const int  trackH   = V_TRACK_H;
 
-    g->setFont(&fonts::Font2);
-    g->setTextDatum(td);
-    g->setTextColor(C_DIM, C_BG);
-    g->drawString(label, textX, V_TITLE_Y);
-
     const float rem = 100.0f - util;
+    const float u   = util < 0 ? 0 : (util > 100 ? 100 : util);
+    const float e   = valid ? elapsedFraction(resetEpoch, windowSec) : -1.0f;
+    // The colour this column's bar is drawn in. Words that take it read as
+    // belonging to this bar and not the one beside it.
+    const uint16_t barCol = overage ? (rejected ? C_CRIT : C_PAY)
+                          : (valid && e >= 0.0f) ? paceColor(u / 100.0f, e) : C_OK;
+
     char resetTxt[24];
     bool haveReset = valid && fmtReset(resetEpoch, resetTxt, sizeof(resetTxt),
                                        windowSec > WIN_5H);
@@ -645,58 +648,61 @@ static void drawVBar(bool primary, const char* label, float util,
     bool haveOvReset = overage && fmtReset(ov->overageResetEpoch, ovResetTxt,
                                            sizeof(ovResetTxt), false);
 
-    if (primary) {
-        const bool plenty = rem >= 40.0f;
+    // Title. The binding window's is lit: white on the wide column, where the
+    // headline carries the colour, and the bar's colour on the thin one.
+    const uint16_t lit = !binds ? C_DIM : (wide ? C_TEXT : barCol);
+    g->setFont(&fonts::Font2);
+    g->setTextDatum(td);
+    g->setTextColor(lit, C_BG);
+    g->drawString(label, textX, V_TITLE_Y);
+
+    int blockBot = V_TITLE_Y + 16;
+    if (wide) {
         char headline[24];
         uint16_t   hcol;
         if (overage) {
             strlcpy(headline, overageWord(ov->overageStatus), sizeof(headline));
-            hcol = rejected ? C_CRIT : C_PAY;
+            hcol = barCol;
         } else if (!valid) {
             strlcpy(headline, "--", sizeof(headline)); hcol = C_DIM;
-        } else if (plenty) {
-            snprintf(headline, sizeof(headline), "%d%% left", (int)(rem + 0.5f)); hcol = C_TEXT;
-        } else if (haveReset) {
-            strlcpy(headline, resetTxt, sizeof(headline)); hcol = C_ACCENT;
         } else {
-            strlcpy(headline, "--", sizeof(headline)); hcol = C_DIM;
+            snprintf(headline, sizeof(headline), "%d%% left", (int)(rem + 0.5f));
+            hcol = barCol == C_OK ? C_TEXT : barCol;
         }
         g->setFont(&fonts::FreeSansBold12pt7b);
         g->setTextDatum(top_left);
         g->setTextColor(hcol, C_BG);
         g->drawString(headline, textX + V_HEAD_KERN, V_HEAD_Y);
+        blockBot = showReason ? V_REASON_Y + 16 : V_HEAD_Y + 23;
 
-        g->setFont(&fonts::Font2);
-        g->setTextDatum(top_left);
-        if (overage) {
-            if (rejected && ov->overageDisabledReason[0]) {
-                char reason[32];
-                strlcpy(reason, ov->overageDisabledReason, sizeof(reason));
-                for (char* p = reason; *p; p++) if (*p == '_') *p = ' ';
-                g->setTextColor(C_DIM, C_BG);
-                g->drawString(reason, textX, V_REASON_Y);
-            }
-            if (haveOvReset) {
-                g->setTextColor(C_DIM, C_BG);
-                g->drawString(ovResetTxt, textX, V_FOOT_Y);
-            }
-        } else if (valid && plenty && haveReset) {
+        if (showReason) {
+            char reason[32];
+            strlcpy(reason, ov->overageDisabledReason, sizeof(reason));
+            for (char* p = reason; *p; p++) if (*p == '_') *p = ' ';
+            g->setFont(&fonts::Font2);
             g->setTextColor(C_DIM, C_BG);
-            g->drawString(resetTxt, textX, V_FOOT_Y);
-        } else if (valid && rem <= 0.0f) {
-            g->setTextColor(C_WARN, C_BG);
-            g->drawString("out", textX, V_FOOT_Y);
-        } else if (valid && rem < 12.0f) {
-            g->setTextColor(C_WARN, C_BG);
-            g->drawString("nearly out", textX, V_FOOT_Y);
+            g->drawString(reason, textX, V_REASON_Y);
         }
+    } else if (overage || valid) {
+        char sub[16];
+        if (overage) strlcpy(sub, overageWord(ov->overageStatus), sizeof(sub));
+        else         snprintf(sub, sizeof(sub), "%d%% left", (int)(rem + 0.5f));
+        g->setTextColor(overage ? barCol : lit, C_BG);
+        g->drawString(sub, textX, V_SUB_Y);
+        blockBot = V_SUB_Y + 16;
+    }
+
+    // Foot: when this window resets, or when extra usage does.
+    g->setFont(&fonts::Font2);
+    g->setTextDatum(td);
+    g->setTextColor(C_DIM, C_BG);
+    if (overage) {
+        if (haveOvReset) g->drawString(ovResetTxt, textX, V_FOOT_Y);
     } else if (haveReset) {
-        g->setTextColor(C_DIM, C_BG);
         g->drawString(resetTxt, textX, V_FOOT_Y);
     }
 
     g->fillRoundRect(trackX, 0, trackW, trackH, 6, C_CARD);
-    float e = valid ? elapsedFraction(resetEpoch, windowSec) : -1.0f;
     // Overage is an inner-stroked vessel holding whatever is left, not a
     // flood: the bar's rule everywhere is "fill is what is available", so a
     // solid bar would say everything remains. Blocked holds nothing; paying
@@ -704,9 +710,8 @@ static void drawVBar(bool primary, const char* label, float util,
     // fill edge again, so the diamond and the pace word keep their meaning.
     float used = -1.0f;
     if (overage) {
-        const uint16_t ring = rejected ? C_CRIT : C_PAY;
-        g->drawRoundRect(trackX, 0, trackW, trackH, 6, ring);
-        g->drawRoundRect(trackX + 1, 1, trackW - 2, trackH - 2, 5, ring);
+        g->drawRoundRect(trackX, 0, trackW, trackH, 6, barCol);
+        g->drawRoundRect(trackX + 1, 1, trackW - 2, trackH - 2, 5, barCol);
         float orem = rejected ? 0.0f : (1.0f - ov->overageUtil);
         if (orem < 0.0f) orem = 0.0f;
         if (orem > 1.0f) orem = 1.0f;
@@ -714,13 +719,9 @@ static void drawVBar(bool primary, const char* label, float util,
         if (oh > 0) g->fillRoundRect(trackX, trackH - oh, trackW, oh, 6, C_PAY);
         used = 1.0f - orem;
     } else if (valid) {
-        float u = util < 0 ? 0 : (util > 100 ? 100 : util);
         int usedH = (int)(trackH * u / 100.0f + 0.5f);
         int fillH = trackH - usedH;
-        if (fillH > 0) {
-            uint16_t col = (e >= 0.0f) ? paceColor(u / 100.0f, e) : C_OK;
-            g->fillRoundRect(trackX, usedH, trackW, fillH, 6, col);
-        }
+        if (fillH > 0) g->fillRoundRect(trackX, usedH, trackW, fillH, 6, barCol);
         if (days > 1) {
             for (int i = 1; i < days; i++) {
                 g->drawFastHLine(trackX, trackH * i / days, trackW, C_BG);
@@ -736,7 +737,7 @@ static void drawVBar(bool primary, const char* label, float util,
         g->setFont(&fonts::Font2);
         g->setTextDatum(td);
         g->setTextColor(ccol, C_BG);
-        g->drawString(word, textX, captionY(cy, primary, showReason));
+        g->drawString(word, textX, captionY(cy, blockBot));
     }
 
     if (overage) {
@@ -1059,18 +1060,15 @@ void uiDashboard(const UsageData& data, unsigned long lastAttemptMs, int rssi,
 
     // Vertical layout, 2026-09-19 — two columns side by side instead of two
     // bars stacked; see the decision log in plan.md and drawVBar() above for
-    // the reasoning. The 7-day window is promoted to the wide column only
-    // when the server says it is the binding constraint — 23% of requests in
-    // a large capture — so most of the time the 5-hour window gets it.
+    // the reasoning. The columns never trade places. When the server names
+    // the 7-day window as binding (23% of requests in a large capture), that
+    // column's words light up and it takes the extra-usage display.
     const bool sevenBinds = data.ok && strncmp(data.claim, "seven_day", 9) == 0;
 
-    if (sevenBinds) {
-        drawVBar(false, "5-HOUR", data.h5, data.h5ResetEpoch, WIN_5H, data.ok, 1, nullptr);
-        drawVBar(true,  "7-DAY",  data.d7, data.d7ResetEpoch, WIN_7D, data.ok, 7, &data);
-    } else {
-        drawVBar(true,  "5-HOUR", data.h5, data.h5ResetEpoch, WIN_5H, data.ok, 1, &data);
-        drawVBar(false, "7-DAY",  data.d7, data.d7ResetEpoch, WIN_7D, data.ok, 7, nullptr);
-    }
+    drawVBar(false, sevenBinds,  "7-DAY",  data.d7, data.d7ResetEpoch, WIN_7D,
+             data.ok, 7, sevenBinds ? &data : nullptr);
+    drawVBar(true,  !sevenBinds, "5-HOUR", data.h5, data.h5ResetEpoch, WIN_5H,
+             data.ok, 1, sevenBinds ? nullptr : &data);
 
     // Three circles: menu, signal, refresh. The first two are still discs
     // standing in for icons. The third is real as of 2026-09-20, and it is
@@ -1096,11 +1094,10 @@ void uiDashboard(const UsageData& data, unsigned long lastAttemptMs, int rssi,
 }
 
 // ── Menu ──────────────────────────────────────────────────
+// One row. Refresh interval, Network and Control panel sat here doing nothing
+// until 2026-11-09; they come back when there is something behind them.
 const char* const kMenuRows[MENU_ROWS] = {
     "Brightness",
-    "Refresh interval",
-    "Network",
-    "Control panel",
 };
 
 // Geometry shared by the drawing and the hit test, so they cannot disagree.
@@ -1110,7 +1107,11 @@ const char* const kMenuRows[MENU_ROWS] = {
 // is ~7.3mm. Five comfortable rows do not fit 240px and four do, so the menu
 // paid for the size with a row rather than with its margins; the version moved
 // into the header, which is where an "About" row was headed anyway.
-static constexpr int MENU_TOP   = 48;
+//
+// The rows start at 56, not 48, so they begin where the close button's touch
+// zone ends. The close button reuses the menu button's zone (V_MENU_HIT_*)
+// unchanged; at 48 its bottom 8px lay over the last brightness dot.
+static constexpr int MENU_TOP   = V_MENU_HIT_B;
 static constexpr int MENU_ROW_H = 46;
 static constexpr int MENU_X     = 20;
 static constexpr int MENU_W     = SCREEN_W - 40;
@@ -1153,8 +1154,12 @@ void uiMenu(int highlight, uint8_t brightness) {
     g->setTextDatum(top_left);
     g->setTextColor(C_DIM, C_BG);
     g->drawString("Usage-Chan " FW_VERSION, MENU_X, 18);
-    g->setTextDatum(top_right);
-    g->drawString("tap outside to close", MENU_X + MENU_W, 18);
+    // Close, where the menu button was: same box, same touch zone, so the
+    // finger that opened the menu is already resting on the way out. A
+    // placeholder until a close frame is exported from Figma -- see "Icons
+    // are exported, not translated" in docs/design-decisions.md.
+    drawMarkX(V_CTRL_X + V_CIRCLE_D / 2, V_CIRCLE_Y[0] + V_CIRCLE_D / 2, 9,
+              C_CTRL, 1);
 
     for (int i = 0; i < MENU_ROWS; i++) {
         int y = MENU_TOP + i * MENU_ROW_H;

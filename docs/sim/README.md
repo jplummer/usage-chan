@@ -12,6 +12,7 @@ What it cannot show: the backlight, the IPS panel's viewing angle, and how the w
 | `lookfeel.html` | Candidates side by side: the dashboard in every small face, then the menu, PIN entry, and the interstitials (boot, setup, connecting, lockout, error) in Font2 beside a candidate face you choose. Label case, headline face, and the candidate are switches; the sliders drive every dashboard at once |
 | `sketches.html` | Five candidates each for three screens that do not exist yet — the status panel the menu becomes, the legend, and the settings-URL screen. One control panel drives all fifteen, including the degraded states. Reasoning in `docs/exploration-screen-sketches.md` |
 | `alternatives.html` | Ten alternative main views, drawn against the same data the shipped dashboard carries, plus four fixed grids showing every layout in the hard states. Exploration rather than proposals — the vertical bars are staying. Reasoning and the coverage table in `docs/exploration-dashboard-alternatives.md` |
+| `floor.html` | The record of two changes to the vertical dashboard, decided 2026-11-10: bars that stop trading places when the 7-day window binds, and bars that run to the bottom row. Candidates across, states down, drawn by `floor-variants.js`. "Steady" on the round floor is what `screens.js` now draws |
 
 Two of these pages come with checkers rather than eyeballs:
 

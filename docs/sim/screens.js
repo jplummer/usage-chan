@@ -178,18 +178,21 @@
   // ── Vertical dashboard, shipped 2026-09-19 ──────────────
   // Two columns side by side instead of two bars stacked. Each bar fills
   // bottom-up, so its own bottom edge reads as exhaustion the same way the
-  // old bar's right edge did. Whichever window the server names as binding
-  // gets the wide column and the headline; the other gets the thin one — the
-  // same swap drawWindowBar/drawSevenDayBar did above. A reserved column on
-  // the right stays empty on purpose: a fixed-width home for whatever needs
-  // one later (signal, the menu button, an update spinner), rather than more
-  // text fighting for room on a line that's already full.
-  const V7_X = 91, V7_W = 24;          // thin (secondary) column
-  const V5_X = 123, V5_W = 48;         // wide (primary) column
-  const V5_TEXT_X = 178;               // primary text, left-aligned
-  const V7_TEXT_R = 84;                // secondary text, right-aligned to this x
+  // old bar's right edge did. The 5-hour window is always the wide bar on the
+  // right and the 7-day window always the thin bar on the left. Until
+  // 2026-11-10 the window the server named as binding took the wide column,
+  // and the swap produced a screen that looked almost the same and meant
+  // something else. A reserved column on the right stays empty on purpose: a
+  // fixed-width home for whatever needs one later (signal, the menu button,
+  // an update spinner), rather than more text fighting for room on a line
+  // that's already full.
+  const V7_X = 91, V7_W = 24;          // thin column: 7-day
+  const V5_X = 123, V5_W = 48;         // wide column: 5-hour
+  const V5_TEXT_X = 178;               // wide column's text, left-aligned
+  const V7_TEXT_R = 84;                // thin column's text, right-aligned to this x
   const V_CTRL_X = 278, V_CTRL_W = 42;
-  const V_TITLE_Y = 8, V_HEAD_Y = 29, V_FOOT_Y = 216;
+  const V_TITLE_Y = 8, V_HEAD_Y = 29, V_FOOT_Y = 224;
+  const V_SUB_Y = V_TITLE_Y + 18;      // thin column's amount line
   // The headline sits 2px left of the other rows: Sans Bold carries more left
   // bearing than Font2, so matching the box edges leaves the stems misaligned.
   const V_HEAD_X = V5_TEXT_X - 2;
@@ -208,12 +211,12 @@
   const V_MENU_HIT_L = 264, V_MENU_HIT_T = 0, V_MENU_HIT_R = 320, V_MENU_HIT_B = 56;
   // The wifi levels are a data rule, not a picture: four buckets because the
   // frames draw four. The pictures come from design/icons via icons.js.
-  const V_TRACK_H = 224;               // both bars, every state: a bar that
+  const V_TRACK_H = 240;               // both bars, every state: a bar that
                                        // changes length makes the screen
                                        // twitch exactly when it has something
-                                       // to say, and the 16px it gives up is
-                                       // a permanent home for the reset line
-                                       // and the end-of-bar token.
+                                       // to say. Full panel height since
+                                       // 2026-11-10, so the bars stand on the
+                                       // floor of the display.
 
 
   // The pace caption rides with the diamond, so the mark and the words read
@@ -246,92 +249,100 @@
     g.drawString(ch, x, y);
   }
 
-  // Straddles the track's end edge — the boundary you just crossed. The ring
-  // is C_BG, which separates it from the bar above and then vanishes into the
-  // background below, so the token reads as emerging from the bar's end.
-  // The '$' sits by its ink rather than its box: FreeSansBold18pt7b puts that
-  // glyph's 29 rows flush with the box top, so the box goes 29 above the base.
+  // Sits inside the bottom of the track, at the end you just reached. It
+  // straddled the track's end edge while the track stopped at 224; at 240
+  // half of it would be off the panel. The ring is C_BG, which separates the
+  // token from the fill around it. The '$' sits by its ink rather than its
+  // box: FreeSansBold18pt7b puts that glyph's 29 rows flush with the box top,
+  // so the box goes 29 above the base plus a 4px margin.
   function drawToken(g, T, cx, rejected) {
     const col = rejected ? T.crit : T.pay;
     if (rejected) {
-      drawMarkX(g, cx, V_TRACK_H, V_TOKEN_ARM, T.bg, V_TOKEN_T + V_TOKEN_RING);
-      drawMarkX(g, cx, V_TRACK_H, V_TOKEN_ARM, col, V_TOKEN_T);
+      drawMarkX(g, cx, V_TRACK_H - 16, V_TOKEN_ARM, T.bg, V_TOKEN_T + V_TOKEN_RING);
+      drawMarkX(g, cx, V_TRACK_H - 16, V_TOKEN_ARM, col, V_TOKEN_T);
     } else {
       g.setFont(T.title);                       // FreeSansBold18pt7b, ink 29 tall
       const w = g.textWidth('$');
-      outlinedGlyph(g, T, '$', T.title, cx - (w >> 1), V_TRACK_H - 14,
+      outlinedGlyph(g, T, '$', T.title, cx - (w >> 1), V_TRACK_H - 33,
                     col, T.bg, V_TOKEN_RING);
     }
   }
 
-  // One column. `primary` picks the geometry (wide/right vs thin/left) and
-  // how much text rides beside it; `days` puts week dividers on the 7-day bar
-  // and none on the 5-hour one, whichever slot each is drawn in. `overage` is
-  // only ever passed for the primary column, since extra usage only applies
-  // to whichever window is currently binding. Normally the bar runs the full
-  // screen height; it only gives up a strip at its own bottom for the paid
-  // mark once overage is actually active, rather than paying that cost all
-  // the time. `resetTxt` is pre-formatted (the sim has no clock).
-  function drawVBar(g, T, primary, label, util, elapsed, resetTxt, valid, days, overage) {
-    const trackX = primary ? V5_X : V7_X;
-    const trackW = primary ? V5_W : V7_W;
-    const textX  = primary ? V5_TEXT_X : V7_TEXT_R;
-    const datum  = primary ? TL : TR;
+  // One column. `wide` picks the slot: the 48px bar on the right with the
+  // headline, which is always the 5-hour window, or the 24px bar on the left
+  // with one small amount line, which is always the 7-day window. `binds`
+  // says the server named this window as the one that will stop you;
+  // `overage` is only passed for that window, since extra usage only applies
+  // to it. `days` puts day dividers on the 7-day bar. `resetTxt` is
+  // pre-formatted (the sim has no clock).
+  //
+  // Every row holds one kind of fact in every state: title, amount, pace,
+  // and reset time at the foot. Until 2026-11-10 the headline swapped to a
+  // bare reset time below 40%, in an orange that could match the other bar.
+  function drawVBar(g, T, wide, binds, label, util, elapsed, resetTxt, valid, days, overage) {
+    const trackX = wide ? V5_X : V7_X;
+    const trackW = wide ? V5_W : V7_W;
+    const textX  = wide ? V5_TEXT_X : V7_TEXT_R;
+    const datum  = wide ? TL : TR;
 
-    const isOverage = !!(primary && overage && overage.active);
+    const isOverage = !!(overage && overage.active);
     const rejected  = isOverage && overage.status === 'rejected';
+    // The thin column has no room for the reason: "out of credits" is 88px
+    // and the slot is 84.
+    const showReason = wide && rejected && !!overage.disabledReason;
     const trackH    = V_TRACK_H;
 
-    g.setFont(T.small); g.setTextDatum(datum); g.setTextColor(T.dim, T.bg);
+    const rem = 100 - util;
+    const u = Math.max(0, Math.min(100, util));
+    const e = valid ? elapsed : -1;
+    const haveReset = valid && !!resetTxt;
+    // The colour this column's bar is drawn in. Words that take it read as
+    // belonging to this bar and not the one beside it.
+    const barCol = isOverage ? (rejected ? T.crit : T.pay)
+                 : (valid && e >= 0) ? paceColor(T, u / 100, e) : T.ok;
+
+    // Title. The binding window's is lit: white on the wide column, where the
+    // headline carries the colour, and the bar's colour on the thin one.
+    const lit = !binds ? T.dim : (wide ? T.text : barCol);
+    g.setFont(T.small); g.setTextDatum(datum); g.setTextColor(lit, T.bg);
     g.drawString(label, textX, V_TITLE_Y);
 
-    const rem = 100 - util;
-    const haveReset = valid && !!resetTxt;
-
-    if (primary) {
-      const plenty = rem >= 40;
+    let blockBot = V_TITLE_Y + 16;
+    if (wide) {
       let headline, hcol;
-      if (isOverage)      { headline = overageWord(overage.status); hcol = rejected ? T.crit : T.pay; }
-      else if (!valid)    { headline = '--'; hcol = T.dim; }
-      else if (plenty)    { headline = Math.round(rem) + '% left'; hcol = T.text; }
-      else if (haveReset) { headline = resetTxt; hcol = T.accent; }
-      else                { headline = '--'; hcol = T.dim; }
+      if (isOverage)   { headline = overageWord(overage.status); hcol = barCol; }
+      else if (!valid) { headline = '--'; hcol = T.dim; }
+      else             { headline = Math.round(rem) + '% left'; hcol = barCol === T.ok ? T.text : barCol; }
 
       g.setFont(T.stat); g.setTextDatum(TL);
       g.setTextColor(hcol, T.bg);
       g.drawString(headline, textX - 2, V_HEAD_Y);   // optical, see V_HEAD_X
+      blockBot = showReason ? V_REASON_Y + 16 : V_HEAD_Y + 23;
 
-      g.setFont(T.small); g.setTextDatum(TL);
-      if (isOverage) {
-        // The reason explains the headline, so it rides directly under it as a
-        // third line of the same block rather than floating mid-column in the
-        // caption's travel band.
-        if (rejected && overage.disabledReason) {
-          g.setTextColor(T.dim, T.bg);
-          g.drawString(String(overage.disabledReason).replace(/_/g, ' '), textX, V_REASON_Y);
-        }
-        if (overage.resetTxt) {
-          g.setTextColor(T.dim, T.bg);
-          g.drawString(overage.resetTxt, textX, V_FOOT_Y);
-        }
-      } else if (valid && plenty && haveReset) {
-        g.setTextColor(T.dim, T.bg); g.drawString(resetTxt, textX, V_FOOT_Y);
-      } else if (valid && rem <= 0) {
-        g.setTextColor(T.warn, T.bg); g.drawString('out', textX, V_FOOT_Y);
-      } else if (valid && rem < 12) {
-        g.setTextColor(T.warn, T.bg); g.drawString('nearly out', textX, V_FOOT_Y);
+      // The reason explains the headline, so it rides directly under it as a
+      // third line of the same block rather than floating mid-column in the
+      // caption's travel band.
+      if (showReason) {
+        g.setFont(T.small); g.setTextColor(T.dim, T.bg);
+        g.drawString(String(overage.disabledReason).replace(/_/g, ' '), textX, V_REASON_Y);
       }
-    } else if (haveReset) {
-      g.setTextColor(T.dim, T.bg); g.drawString(resetTxt, textX, V_FOOT_Y);
+    } else if (isOverage || valid) {
+      const sub = isOverage ? overageWord(overage.status) : Math.round(rem) + '% left';
+      g.setTextColor(isOverage ? barCol : lit, T.bg);
+      g.drawString(sub, textX, V_SUB_Y);
+      blockBot = V_SUB_Y + 16;
     }
 
+    // Foot: when this window resets, or when extra usage does.
+    g.setFont(T.small); g.setTextDatum(datum); g.setTextColor(T.dim, T.bg);
+    if (isOverage) { if (overage.resetTxt) g.drawString(overage.resetTxt, textX, V_FOOT_Y); }
+    else if (haveReset) g.drawString(resetTxt, textX, V_FOOT_Y);
+
     g.fillRoundRect(trackX, 0, trackW, trackH, 6, T.card);
-    const e = valid ? elapsed : -1;
     let used = null;
     if (isOverage) {
-      const ring = rejected ? T.crit : T.pay;
-      g.drawRoundRect(trackX, 0, trackW, trackH, 6, ring);
-      g.drawRoundRect(trackX + 1, 1, trackW - 2, trackH - 2, 5, ring);
+      g.drawRoundRect(trackX, 0, trackW, trackH, 6, barCol);
+      g.drawRoundRect(trackX + 1, 1, trackW - 2, trackH - 2, 5, barCol);
       // Blocked holds nothing. Paying holds whatever the overage budget has
       // left, read by the same rule as the green: fill is what is available.
       const orem = rejected ? 0 : Math.max(0, Math.min(1, overage.remaining || 0));
@@ -339,13 +350,9 @@
       if (oh > 0) g.fillRoundRect(trackX, trackH - oh, trackW, oh, 6, T.pay);
       used = 1 - orem;
     } else if (valid) {
-      const u = Math.max(0, Math.min(100, util));
       const usedH = Math.round(trackH * u / 100);
       const fillH = trackH - usedH;
-      if (fillH > 0) {
-        const col = e >= 0 ? paceColor(T, u / 100, e) : T.ok;
-        g.fillRoundRect(trackX, usedH, trackW, fillH, 6, col);
-      }
+      if (fillH > 0) g.fillRoundRect(trackX, usedH, trackW, fillH, 6, barCol);
       if (days > 1) {
         for (let i = 1; i < days; i++) g.drawFastHLine(trackX, (trackH * i / days) | 0, trackW, T.bg);
       }
@@ -355,11 +362,8 @@
       const cy = Math.round(trackH * e);
       drawPaceTick(g, T, trackX + trackW / 2, cy);
       const [word, col2] = paceWord(T, used, e);
-      // Title and headline are one block, so the caption has one obstacle
-      // above and one below, and rests on the row just under the block.
-      const showReason = isOverage && rejected && overage.disabledReason;
-      const blockBot = primary ? (showReason ? V_REASON_Y + 16 : V_HEAD_Y + 23)
-                               : V_TITLE_Y + 16;
+      // The title block is the caption's one obstacle above and the reset
+      // line its one obstacle below.
       const avoid = [[V_TITLE_Y, blockBot], [V_FOOT_Y, V_FOOT_Y + 16]];
       g.setFont(T.small); g.setTextDatum(datum); g.setTextColor(col2, T.bg);
       g.drawString(word, textX, captionY(cy, avoid));
@@ -576,13 +580,8 @@
   function dashboard(g, T, s) {
     g.fillScreen(T.bg);
     const sevenBinds = !!s.sevenBinds;
-    if (sevenBinds) {
-      drawVBar(g, T, false, '5-HOUR', s.h5, s.e5, s.reset5, s.ok, 1, null);
-      drawVBar(g, T, true,  '7-DAY',  s.d7, s.e7, s.reset7, s.ok, 7, s.overage);
-    } else {
-      drawVBar(g, T, true,  '5-HOUR', s.h5, s.e5, s.reset5, s.ok, 1, s.overage);
-      drawVBar(g, T, false, '7-DAY',  s.d7, s.e7, s.reset7, s.ok, 7, null);
-    }
+    drawVBar(g, T, false, sevenBinds,  '7-DAY',  s.d7, s.e7, s.reset7, s.ok, 7, sevenBinds ? s.overage : null);
+    drawVBar(g, T, true,  !sevenBinds, '5-HOUR', s.h5, s.e5, s.reset5, s.ok, 1, sevenBinds ? null : s.overage);
 
     // Menu, signal, refresh. The first two are still discs standing in for
     // icons. The third is real: a ring that fills as the poll interval runs
@@ -623,8 +622,8 @@
   }
 
   // ── Menu, as shipped ────────────────────────────────────
-  const MENU_ROWS = ['Brightness', 'Refresh interval', 'Network', 'Control panel'];
-  const MENU_TOP = 48, MENU_ROW_H = 46, MENU_X = 20, MENU_W = 320 - 40;
+  const MENU_ROWS = ['Brightness'];
+  const MENU_TOP = 56, MENU_ROW_H = 46, MENU_X = 20, MENU_W = 320 - 40;
   const LEVELS = 5, DOT_PITCH = 36;
   const DOT_X0 = MENU_X + MENU_W - 10 - DOT_PITCH * LEVELS + (DOT_PITCH >> 1);
 
@@ -640,7 +639,8 @@
     g.fillScreen(T.bg);
     g.setFont(T.small); g.setTextDatum(TL); g.setTextColor(T.dim, T.bg);
     g.drawString('Usage-Chan 0.1.0', MENU_X, 18);
-    g.setTextDatum(TR); g.drawString('tap outside to close', MENU_X + MENU_W, 18);
+    // Close, in the menu button's box. Placeholder until Figma has a frame.
+    drawMarkX(g, V_CTRL_X + 16, V_CIRCLE_Y0 + 16, 9, T.ctrl, 1);
     for (let i = 0; i < MENU_ROWS.length; i++) {
       const y = MENU_TOP + i * MENU_ROW_H, on = i === s.highlight;
       g.fillRoundRect(MENU_X, y + 3, MENU_W, MENU_ROW_H - 6, 6, on ? T.accent : T.card);

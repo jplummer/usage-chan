@@ -421,7 +421,7 @@
     const V = SCREENS.V;
     g.fillScreen(T.bg);
 
-    SCREENS.drawVBar(g, T, false, '7-DAY', s.d7, s.e7, s.reset7, s.ok, 7, null);
+    SCREENS.drawVBar(g, T, false, false, '7-DAY', s.d7, s.e7, s.reset7, s.ok, 7, null);
 
     const x = V.V5_X, w = V.V5_W, tx = V.V5_TEXT_X;
     const used = bar(g, T, x, w, s);
@@ -512,7 +512,7 @@
   function vLadder(g, T, s) {
     const V = SCREENS.V;
     g.fillScreen(T.bg);
-    SCREENS.drawVBar(g, T, false, '7-DAY', s.d7, s.e7, s.reset7, s.ok, 7, null);
+    SCREENS.drawVBar(g, T, false, false, '7-DAY', s.d7, s.e7, s.reset7, s.ok, 7, null);
 
     const x = V.V5_X, w = V.V5_W, tx = V.V5_TEXT_X;
     const util = Math.max(0, Math.min(100, s.h5)), rem = 100 - util;

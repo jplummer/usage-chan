@@ -1,0 +1,123 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Usage-Chan sim · flip &amp; floor</title>
+<link rel="stylesheet" href="sim.css">
+<script src="fonts.js"></script>
+<script src="lgfx.js"></script>
+<script src="icons.js"></script>
+<script src="screens.js"></script>
+<script src="floor-variants.js"></script>
+<style>
+  .sheet{display:grid;gap:14px 16px;align-items:start}
+  .sheet canvas{width:100%;height:auto}
+  .sheet .col{font-family:var(--mono);font-size:12px;letter-spacing:.05em}
+  .sheet .col.shipped{color:var(--accent)}
+  .sheet .row{grid-column:1/-1;font-family:var(--mono);font-size:11px;
+              color:var(--ink-dim);letter-spacing:.07em;text-transform:uppercase;
+              border-top:1px solid var(--rule);padding-top:10px}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">usage-chan · simulator · decided 2026-11-10</div>
+    <h1>The flip &amp; the floor</h1>
+    <p class="lede">Two changes to the vertical dashboard, from 2026-11-09.
+    The bars stop trading places when the 7-day window binds, and the bars run
+    to the bottom row of the panel. Steady on the round floor was chosen and
+    is now in <code>screens.js</code> and <code>src/ui.cpp</code>; this page
+    is the record of the candidates, drawn by <code>floor-variants.js</code>. Each column is a candidate and each row is
+    a state, so read across to compare candidates and down to see whether one
+    candidate holds its meaning as the state changes.</p>
+  </header>
+
+  <section>
+    <h2>1 · The flip</h2>
+    <p><b>Shipped</b> gives the wide column and the headline to whichever
+    window the server names as binding. Rows one and four are the same layout
+    with the two windows swapped, which is the screen that had to be reread.</p>
+    <p>The candidates keep 5-hour wide on the right and 7-day thin on the
+    left, always, and are drawn on the chosen floor (section 2). The 7-day
+    column always says how much is left. Extra usage (the outline, the mark,
+    and the word) goes to whichever window binds.</p>
+    <p><b>Tinted</b> keeps the headline with the 5-hour window. When the
+    7-day window binds, its title and amount take the color of its bar.</p>
+    <p><b>Steady</b> is tinted, and the 5-hour headline is always the amount
+    left. Shipped swaps it for a bare reset time below 40%, in an orange that
+    can match the other bar. Here the reset time stays at the foot, and the
+    headline takes its own bar's color when that is not green.</p>
+    <p><b>Cross</b> looks like tinted until the 7-day window binds. Then the big
+    headline leaves the 5-hour column and a smaller one appears beside the
+    7-day bar, in 9pt bold because the 12pt face does not fit that 84px slot.
+    The 5-hour column drops to a small line. "out of credits" is 88px in that
+    slot and loses its first 4px off the left edge.</p>
+    <div class="sheet" id="flip"></div>
+  </section>
+
+  <section>
+    <h2>2 · The floor</h2>
+    <p>Shipped tracks stop at row 224 of 240. Chosen: tracks run to 240 with
+    round bottoms, and the reset labels drop from y=216 to y=224. A mark that
+    straddles the bar's end would be half off the panel, so it moves inside.
+    Both columns use the tinted layout so only the floor differs. Not yet
+    checked on the device: whether the bezel hides the last rows.</p>
+    <div class="sheet" id="floor"></div>
+  </section>
+</div>
+
+<script>
+(function () {
+  const T = SCREENS.SHIPPED, g = new LGFX(), F = FLOORVARIANTS;
+  const base = { ok: true, h5: 38, e5: 0.52, d7: 31, e7: 0.46,
+                 reset5: '3:40pm', reset7: 'Fri 1pm' };
+  const pay = { active: true, status: 'allowed', remaining: 0.6, resetTxt: 'Dec 1' };
+  const blk = { active: true, status: 'rejected', disabledReason: 'out_of_credits',
+                resetTxt: 'Dec 1' };
+  const st = more => Object.assign({}, base, more);
+
+  // cols: [title, draw(state)] · rows: [title, state]
+  function sheet(id, cols, rows) {
+    const el = document.getElementById(id);
+    el.style.gridTemplateColumns = `repeat(${cols.length}, minmax(0, 1fr))`;
+    const add = (cls, text) => {
+      const d = document.createElement('div'); d.className = cls; d.textContent = text;
+      el.appendChild(d);
+    };
+    cols.forEach(([t], i) => add('col' + (i === 0 ? ' shipped' : ''), t));
+    for (const [title, state] of rows) {
+      add('row', title);
+      for (const [, draw] of cols) {
+        const c = document.createElement('canvas');
+        el.appendChild(c);
+        draw(state); g.blit(c, 2);
+      }
+    }
+  }
+
+  sheet('flip', [
+    ['shipped: binding takes the wide slot', s => F.screen(g, T, s, 'flip')],
+    ['tinted', s => F.screen(g, T, s, 'tinted', F.GEO.floorRound)],
+    ['steady', s => F.screen(g, T, s, 'steady', F.GEO.floorRound)],
+    ['cross', s => F.screen(g, T, s, 'cross', F.GEO.floorRound)],
+  ], [
+    ['5-hour binds', base],
+    ['5-hour nearly out', st({ h5: 93, e5: 0.97, d7: 55 })],
+    ['5-hour low and ahead of pace', st({ h5: 78, e5: 0.5, d7: 55 })],
+    ['7-day binds, 22% left', st({ sevenBinds: true, d7: 78, e7: 0.6 })],
+    ['7-day binds, out; a new 5-hour window has just opened',
+     st({ sevenBinds: true, d7: 100, e7: 0.8, h5: 3, e5: 0.12, overage: pay })],
+    ['7-day binds, paying for extra usage', st({ sevenBinds: true, d7: 100, e7: 0.8, overage: pay })],
+    ['7-day binds, blocked', st({ sevenBinds: true, d7: 100, e7: 0.8, overage: blk })],
+  ]);
+
+  const geo = k => s => F.screen(g, T, s, 'tinted', F.GEO[k]);
+  sheet('floor', [
+    ['shipped: 224, labels at 216', geo('shipped')],
+    ['floor, round bottom, labels at 224', geo('floorRound')],
+  ], [
+    ['plenty left', base],
+    ['5-hour nearly out', st({ h5: 93, e5: 0.97, d7: 55 })],
+    ['paying for extra usage', st({ h5: 100, e5: 0.8, overage: pay })],
+    ['blocked', st({ h5: 100, e5: 0.8, overage: blk })],
+  ]);
+})();
+</script>

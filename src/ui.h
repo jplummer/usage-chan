@@ -61,9 +61,9 @@ bool uiMenuButtonHit(int x, int y);
 void uiError(const char* title, const char* detail = nullptr);
 
 // ── Menu ─────────────────────────────────────────────────
-// Dummy contents for now: this exists to prove tap-to-open/close and to give
-// the settings work somewhere to land. Rows do nothing yet.
-#define MENU_ROWS 4
+// One working row, Brightness, and a close button where the menu button was.
+// The settings work lands here as more rows.
+#define MENU_ROWS 1
 extern const char* const kMenuRows[MENU_ROWS];
 
 // Draws the menu. `highlight` is the row under the finger, or -1 for none.
@@ -71,7 +71,8 @@ extern const char* const kMenuRows[MENU_ROWS];
 void uiMenu(int highlight, uint8_t brightness);
 
 // Returns the row index at a touch point, or -1 if the touch was outside the
-// rows (which the caller treats as "close").
+// rows (which the caller treats as "close" -- that covers the close button,
+// whose zone sits above the first row).
 int  uiMenuRowAt(int x, int y);
 
 // For a tap on the Brightness row: which of the dots it landed on, or -1 if it

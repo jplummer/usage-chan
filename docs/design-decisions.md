@@ -177,6 +177,8 @@ Two things follow.
 | ≥ 40% | `62% left` | `resets 3:40pm` | *Should I start this?* |
 | < 40% | `3:40pm` | — (or `nearly out` below 12%) | *Should I wait?* |
 
+**Reversed 2026-11-10** – see "The columns stopped trading places" below. The headline is the amount in every state now, and the reset time stays in the footnote.
+
 Late in a window the number worth making big is not how much is left — it is when you get more. The bar keeps carrying the amount throughout, which is the honest way to be imprecise about it.
 
 `nearly out` survives below 12%, because it claims **proximity** rather than a fraction. That is a warning, not a quantity, and cannot be wrong by 2×.
@@ -638,6 +640,18 @@ Keys are 96x46, three across and four down. 46px is about 7.3mm, which is the si
 34px rows on this panel are about 5.4mm at ~160 px/inch, and were unreliable to hit. 46px is ~7.3mm and works.
 
 Five comfortable rows do not fit 240px and four do, so the menu lost a row rather than its margins. The version moved into the header, which is where an "About" row was headed anyway.
+
+## The columns stopped trading places, and the bars reached the floor
+
+**2026-11-10.** Jon saw the seven-day window bind on the device for the first time, and the screen that resulted looked almost the same as the usual one and meant something different. Having to reinterpret an almost-the-same display was the complaint. Three changes follow from it, and they share one rule: every element stays in one place and holds one kind of fact.
+
+**The windows are pinned.** Five-hour is always the wide bar with the headline; seven-day is always the thin bar with a small amount line. The binding window is marked by its title lighting up, and by the extra-usage display moving to it. A candidate that moved the headline beside the seven-day bar when it bound ("cross" in `docs/sim/floor.html`) was liked and set aside: that slot is 84px, the 12pt headline does not fit it, and `out of credits` clips.
+
+**The headline is always the amount.** This reverses "Precision migrates by swapping slots" above. The swap had the same fault as the flip: below 40% the headline became a bare `3:40pm` with nothing saying it was a reset, in an accent orange close enough to the `a bit ahead` bar color that it read as belonging to the other bar. The reset time now sits at the foot of its column in every state. What is lost is the argument that late in a window the big number should be *when you get more*; the time is still on screen, small. `nearly out` and `out` went with the swap, since `7% left` and `0% left` say the same.
+
+**Color links words to their bar.** A bar ahead of pace is orange or red, and its amount takes that color. A green bar's amount stays white, so color on text always means something is off.
+
+**The bars run to row 240.** The 16px strip under the old 224px track was a home for the reset line and the straddling token. The reset line moved down to y=224 and the token moved inside the bar's end, since half of a straddling one would be off the panel. Not yet confirmed on the device: whether the bezel covers the last rows. The `stackchan-test` build exists to check that, and to show the extra-usage states, which nobody had seen on the panel.
 
 ## Open questions
 
